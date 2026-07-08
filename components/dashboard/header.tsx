@@ -3,6 +3,8 @@ import { signOut } from "next-auth/react";
 import { LogOut } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { NotificationBell } from "@/components/notification-bell";
+import { ConnectionStatus } from "@/components/connection-status";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -26,36 +28,41 @@ function initials(name?: string | null, email?: string | null) {
 
 export function Header({ user }: { user?: HeaderUser }) {
   return (
-    <header className="flex h-12 items-center justify-between border-b px-4">
-      <div />
-      <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-1.5 py-1 outline-none hover:bg-muted">
-          <Avatar size="sm">
-            <AvatarFallback>{initials(user?.name, user?.email)}</AvatarFallback>
-          </Avatar>
-          <span className="text-sm font-medium">
-            {user?.name ?? user?.email}
-          </span>
-          {user?.role && (
-            <Badge variant="outline" className="capitalize">
-              {user.role}
-            </Badge>
-          )}
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            variant="destructive"
-            onClick={() => signOut({ callbackUrl: "/login" })}
-          >
-            <LogOut />
-            Logout
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+    <header className="flex h-12 items-center justify-end border-b px-4">
+      <div className="flex items-center gap-3">
+        <ConnectionStatus />
+        <NotificationBell />
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-1.5 py-1 outline-none hover:bg-muted">
+            <Avatar size="sm">
+              <AvatarFallback>
+                {initials(user?.name, user?.email)}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-medium">
+              {user?.name ?? user?.email}
+            </span>
+            {user?.role && (
+              <Badge variant="outline" className="capitalize">
+                {user.role}
+              </Badge>
+            )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => signOut({ callbackUrl: "/login" })}
+            >
+              <LogOut />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </header>
   );
 }
