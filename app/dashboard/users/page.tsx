@@ -1,6 +1,5 @@
 "use client"; // cần vì có useState/useEffect và gọi fetch phía client bằng accessToken
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
 import { ChevronLeft, ChevronRight, RotateCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -27,8 +26,6 @@ type PaginatedUsers = {
 const LIMIT = 10;
 
 export default function UsersPage() {
-  const { data: session } = useSession();
-
   const [users, setUsers] = useState<User[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -40,10 +37,7 @@ export default function UsersPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!session?.accessToken) return;
-
     const controller = new AbortController();
-    // Debounce so name/email keystrokes don't fire a request per character
     const timer = setTimeout(async () => {
       setLoading(true);
       setError("");
@@ -56,13 +50,14 @@ export default function UsersPage() {
           ...(role && { role }),
         });
 
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/users?${params}`,
-          {
-            headers: { Authorization: `Bearer ${session.accessToken}` },
-            signal: controller.signal,
-          },
-        );
+        const res = await fetch(`/api/users?${params}`, {
+          signal: controller.signal,
+        });
+
+        if (res.status === 401) {
+          window.location.href = "/login";
+          return;
+        }
 
         if (!res.ok) throw new Error("Could not load the user list");
 
@@ -82,7 +77,7 @@ export default function UsersPage() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [session, page, name, email, role]);
+  }, [page, name, email, role]); // bỏ `session` khỏi dependency array
 
   return (
     <div className="flex flex-col gap-4">

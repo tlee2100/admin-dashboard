@@ -1,5 +1,12 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+
+// Phân biệt "cần 2FA" với "sai email/mật khẩu" — cả 2 đều xảy ra trong
+// cùng 1 lần gọi authorize(), nhưng Server Action cần xử lý khác nhau
+// (chuyển sang bước nhập mã, thay vì hiển thị lỗi đăng nhập)
+export class TwoFactorRequiredError extends CredentialsSignin {
+  code = "two_factor_required";
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -7,16 +14,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
-        // Present only on the 2FA step (6-digit TOTP code)
         code: { label: "2FA code", type: "text" },
         recaptchaToken: { label: "reCAPTCHA token", type: "text" },
       },
-      // authorize() là nơi DUY NHẤT bạn tự viết logic xác thực
       authorize: async (credentials) => {
         const email = credentials?.email as string | undefined;
         const code = credentials?.code as string | undefined;
 
-        // Bước 2 của luồng 2FA: xác thực bằng mã TOTP thay vì mật khẩu
         if (code) {
           const res = await fetch(
             `${process.env.API_URL}/auth/verify-2fa-login`,
@@ -26,7 +30,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               body: JSON.stringify({ email, code }),
             },
           );
-
           if (!res.ok) return null;
 
           const data = await res.json();
@@ -40,7 +43,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           };
         }
 
-        // Bước 1 (bình thường): email + password + recaptcha
         const res = await fetch(`${process.env.API_URL}/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -51,13 +53,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }),
         });
 
-        // Nếu NestJS trả 401/400 → coi như đăng nhập sai
-        if (!res.ok) return null;
-
         const data = await res.json();
-        // Tài khoản bật 2FA nhưng client lại gọi thẳng bước 1 (không qua pre-check)
-        // → không có access_token, coi như chưa đủ điều kiện đăng nhập
-        if (!data?.access_token) return null;
+
+        // Backend trả 200 kèm twoFactorRequired: true (không throw lỗi)
+        // → phải check trước khi check res.ok / access_token
+        if (data?.twoFactorRequired) {
+          throw new TwoFactorRequiredError();
+        }
+
+        if (!res.ok || !data?.access_token) return null;
 
         return {
           id: String(data.user.id),
@@ -68,32 +72,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-  session: { strategy: "jwt" }, // bắt buộc phải là "jwt" vì Credentials provider không hỗ trợ database session
+  session: { strategy: "jwt" },
   callbacks: {
-    // jwt() chạy MỖI KHI có request liên quan đến session (kể cả không login lại)
-    // nhưng `user` chỉ có giá trị ở LẦN ĐẦU (ngay sau khi authorize() thành công)
     async jwt({ token, user }) {
       if (user) {
         token.accessToken = user.accessToken;
         token.role = user.role;
-
-        // Login response không kèm `name` → gọi thêm 1 lần để làm giàu token
-        // (khớp với luồng "session & callbacks enrich data" của thiết kế)
         try {
           const res = await fetch(`${process.env.API_URL}/users/${user.id}`);
           if (res.ok) {
             const profile = await res.json();
             token.name = profile.name;
           }
-        } catch {
-          // Không chặn đăng nhập nếu bước enrich thất bại
-        }
+        } catch {}
       }
-      return token; // token này được mã hoá và lưu vào cookie
+      return token;
     },
-    // session() chạy mỗi khi client gọi useSession() hoặc server gọi auth()
-    // Nhiệm vụ: lấy data từ token (đã mã hoá, phía server) và "phơi" ra session object
-    // mà client component có thể đọc được
     async session({ session, token }) {
       session.accessToken = token.accessToken as string;
       session.user.id = token.sub as string;
@@ -103,6 +97,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
   },
   pages: {
-    signIn: "/login", // Auth.js sẽ redirect về đây khi cần login, thay vì trang mặc định
+    signIn: "/login",
   },
 });

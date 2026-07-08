@@ -1,9 +1,18 @@
 "use client";
-import { signIn } from "next-auth/react"; // KHÁC với signIn export từ auth.ts (đó là bản server-side)
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+
+import { useState, useTransition } from "react";
+import { useActionState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { getRecaptchaToken } from "@/lib/recaptcha";
+import { loginAction, type LoginState } from "@/app/api/login/actions";
+import {
+  loginSchema,
+  twoFactorSchema,
+  type LoginInput,
+  type TwoFactorInput,
+} from "@/lib/validations/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,83 +24,56 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 
-type Stage = "credentials" | "2fa";
+const initialState: LoginState = { stage: "credentials" };
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [stage, setStage] = useState<Stage>("credentials");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [state, formAction, isActionPending] = useActionState(
+    loginAction,
+    initialState,
+  );
+  const [isTransitionPending, startTransition] = useTransition();
+  const isPending = isActionPending || isTransitionPending;
 
-  async function handleCredentialsSubmit(
-    e: React.SubmitEvent<HTMLFormElement>,
-  ) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      const recaptchaToken = await getRecaptchaToken("login");
+  // Override cục bộ chỉ dùng cho nút "Back" — không liên quan tới state
+  // server trả về, tự reset mỗi khi có dispatch mới tới server
+  const [stageOverride, setStageOverride] = useState<"credentials" | null>(
+    null,
+  );
+  const stage = stageOverride ?? state.stage;
 
-      // Pre-check via a same-origin proxy so we can detect a 2FA-required
-      // response before committing to a NextAuth session.
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, recaptchaToken }),
-      });
-      const data = await res.json();
+  const credentialsForm = useForm<LoginInput>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+  });
 
-      if (data?.twoFactorRequired) {
-        setStage("2fa");
-        return;
-      }
+  const twoFactorForm = useForm<TwoFactorInput>({
+    resolver: zodResolver(twoFactorSchema),
+    defaultValues: { code: "" },
+  });
 
-      if (!res.ok || !data?.access_token) {
-        setError(data?.message ?? "Email hoặc mật khẩu không đúng");
-        return;
-      }
+  async function onCredentialsSubmit(values: LoginInput) {
+    setStageOverride(null);
+    const recaptchaToken = await getRecaptchaToken("login");
+    const fd = new FormData();
+    fd.set("step", "credentials");
+    fd.set("email", values.email);
+    fd.set("password", values.password);
+    fd.set("recaptchaToken", recaptchaToken);
 
-      const signInRes = await signIn("credentials", {
-        email,
-        password,
-        recaptchaToken,
-        redirect: false,
-      });
-      if (signInRes?.error) {
-        setError("Email hoặc mật khẩu không đúng");
-        return;
-      }
-      router.push("/dashboard");
-    } catch {
-      setError("Không thể kết nối tới máy chủ");
-    } finally {
-      setLoading(false);
-    }
+    startTransition(() => {
+      formAction(fd);
+    });
   }
 
-  async function handleCodeSubmit(e: React.SubmitEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      const signInRes = await signIn("credentials", {
-        email,
-        code,
-        redirect: false,
-      });
-      if (signInRes?.error) {
-        setError("Mã 2FA không đúng");
-        return;
-      }
-      router.push("/dashboard");
-    } catch {
-      setError("Không thể kết nối tới máy chủ");
-    } finally {
-      setLoading(false);
-    }
+  async function onCodeSubmit(values: TwoFactorInput) {
+    setStageOverride(null);
+    const fd = new FormData();
+    fd.set("step", "2fa");
+    fd.set("code", values.code);
+
+    startTransition(() => {
+      formAction(fd);
+    });
   }
 
   return (
@@ -104,34 +86,46 @@ export default function LoginPage() {
           <CardDescription>
             {stage === "credentials"
               ? "Enter your credentials to access the admin dashboard"
-              : `Enter the 6-digit code from your authenticator app for ${email}`}
+              : `Enter the 6-digit code from your authenticator app for ${state.email}`}
           </CardDescription>
         </CardHeader>
 
         {stage === "credentials" ? (
-          <form onSubmit={handleCredentialsSubmit}>
+          <form onSubmit={credentialsForm.handleSubmit(onCredentialsSubmit)}>
             <CardContent className="flex flex-col gap-3">
-              <Input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                type="email"
-                placeholder="Email"
-                autoComplete="email"
-                required
-              />
-              <Input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type="password"
-                placeholder="Password"
-                autoComplete="current-password"
-                required
-              />
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              <div>
+                <Input
+                  {...credentialsForm.register("email")}
+                  type="email"
+                  placeholder="Email"
+                  autoComplete="email"
+                />
+                {credentialsForm.formState.errors.email && (
+                  <p className="mt-1 text-sm text-destructive">
+                    {credentialsForm.formState.errors.email.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Input
+                  {...credentialsForm.register("password")}
+                  type="password"
+                  placeholder="Password"
+                  autoComplete="current-password"
+                />
+                {credentialsForm.formState.errors.password && (
+                  <p className="mt-1 text-sm text-destructive">
+                    {credentialsForm.formState.errors.password.message}
+                  </p>
+                )}
+              </div>
+              {state.error && (
+                <p className="text-sm text-destructive">{state.error}</p>
+              )}
             </CardContent>
             <CardFooter className="flex-col items-stretch gap-3">
-              <Button type="submit" disabled={loading} className="w-full">
-                {loading && <Loader2 className="animate-spin" />}
+              <Button type="submit" disabled={isPending} className="w-full">
+                {isPending && <Loader2 className="animate-spin" />}
                 Sign in
               </Button>
               <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
@@ -141,34 +135,40 @@ export default function LoginPage() {
             </CardFooter>
           </form>
         ) : (
-          <form onSubmit={handleCodeSubmit}>
+          <form onSubmit={twoFactorForm.handleSubmit(onCodeSubmit)}>
             <CardContent className="flex flex-col gap-3">
-              <Input
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                type="text"
-                inputMode="numeric"
-                placeholder="123456"
-                maxLength={6}
-                autoComplete="one-time-code"
-                autoFocus
-                required
-              />
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              <div>
+                <Input
+                  {...twoFactorForm.register("code")}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="123456"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  autoFocus
+                />
+                {twoFactorForm.formState.errors.code && (
+                  <p className="mt-1 text-sm text-destructive">
+                    {twoFactorForm.formState.errors.code.message}
+                  </p>
+                )}
+              </div>
+              {state.error && (
+                <p className="text-sm text-destructive">{state.error}</p>
+              )}
             </CardContent>
             <CardFooter className="flex-col items-stretch gap-2">
-              <Button type="submit" disabled={loading} className="w-full">
-                {loading && <Loader2 className="animate-spin" />}
+              <Button type="submit" disabled={isPending} className="w-full">
+                {isPending && <Loader2 className="animate-spin" />}
                 Verify
               </Button>
               <Button
                 type="button"
                 variant="ghost"
-                disabled={loading}
+                disabled={isPending}
                 onClick={() => {
-                  setStage("credentials");
-                  setCode("");
-                  setError("");
+                  setStageOverride("credentials");
+                  twoFactorForm.reset({ code: "" });
                 }}
               >
                 Back
