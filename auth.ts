@@ -109,8 +109,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   session: { strategy: "jwt" },
   callbacks: {
-    async jwt({ token, user }) {
-      // Lần đầu tiên ngay sau khi authorize() thành công (login/verify-2fa)
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.accessToken = user.accessToken;
         token.refreshToken = user.refreshToken;
@@ -122,15 +121,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           if (res.ok) {
             const profile = await res.json();
             token.name = profile.name;
+            token.bio = profile.bio;
+            token.avatarUrl = profile.avatarUrl;
           }
         } catch {}
 
         return token;
       }
 
-      // Các lần sau (mọi request cần session): còn hạn → trả về ngay,
-      // KHÔNG gọi network — đây là fast path giữ cho app nhanh như đã sửa
-      // ở phần Users page trước đó
+      // Client gọi update() sau khi sửa profile thành công — merge data mới
+      // vào token ngay, không cần gọi lại API hay chờ access token hết hạn
+      if (trigger === "update" && session) {
+        if (session.name !== undefined) token.name = session.name;
+        if (session.bio !== undefined) token.bio = session.bio;
+        if (session.avatarUrl !== undefined)
+          token.avatarUrl = session.avatarUrl;
+        return token;
+      }
+
       if (
         typeof token.accessTokenExpires === "number" &&
         Date.now() < token.accessTokenExpires - REFRESH_BUFFER_MS
@@ -138,8 +146,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return token;
       }
 
-      // Sắp hết hạn hoặc đã hết hạn → refresh trong im lặng, user không
-      // hề hay biết, không bị đá ra khỏi trang
       return refreshAccessToken(token);
     },
     async session({ session, token }) {
@@ -147,6 +153,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.user.id = token.sub as string;
       session.user.role = token.role as string;
       session.user.name = (token.name as string) ?? session.user.email;
+      session.user.bio = token.bio as string | null;
+      session.user.avatarUrl = token.avatarUrl as string | null;
       session.error = token.error;
       return session;
     },
