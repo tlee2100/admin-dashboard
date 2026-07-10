@@ -1,6 +1,6 @@
 "use server";
 
-import { CredentialsSignin } from "next-auth";
+import { CredentialsSignin, AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 import { signIn, TwoFactorRequiredError } from "@/auth";
 import { loginSchema, twoFactorSchema } from "@/lib/validations/auth";
@@ -35,7 +35,29 @@ export async function loginAction(
         redirect: false,
       });
     } catch (error) {
-      if (error instanceof CredentialsSignin) {
+      const errStr = String(
+        error instanceof Error ? error.cause || error.message : error,
+      ).toLowerCase();
+      if (
+        errStr.includes("fetch failed") ||
+        errStr.includes("econnrefused") ||
+        (error instanceof AuthError &&
+          error.type === "CallbackRouteError" &&
+          errStr.includes("typeerror"))
+      ) {
+        return {
+          stage: "2fa",
+          email: prevState.email,
+          error:
+            "Không thể kết nối tới máy chủ backend (NestJS API). Vui lòng thử lại sau.",
+        };
+      }
+      if (
+        error instanceof CredentialsSignin ||
+        (error instanceof AuthError &&
+          (error.type === "CredentialsSignin" ||
+            error.type === "CallbackRouteError"))
+      ) {
         return {
           stage: "2fa",
           email: prevState.email,
@@ -79,7 +101,29 @@ export async function loginAction(
     if (error instanceof TwoFactorRequiredError) {
       return { stage: "2fa", email: parsed.data.email };
     }
-    if (error instanceof CredentialsSignin) {
+    const errStr = String(
+      error instanceof Error ? error.cause || error.message : error,
+    ).toLowerCase();
+
+    if (
+      errStr.includes("fetch failed") ||
+      errStr.includes("econnrefused") ||
+      (error instanceof AuthError &&
+        error.type === "CallbackRouteError" &&
+        errStr.includes("typeerror"))
+    ) {
+      return {
+        stage: "credentials",
+        error:
+          "Không thể kết nối tới máy chủ backend. Vui lòng đảm bảo server NestJS đã được khởi chạy (http://localhost:3000).",
+      };
+    }
+    if (
+      error instanceof CredentialsSignin ||
+      (error instanceof AuthError &&
+        (error.type === "CredentialsSignin" ||
+          error.type === "CallbackRouteError"))
+    ) {
       return { stage: "credentials", error: "Email hoặc mật khẩu không đúng" };
     }
     throw error;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,7 +24,6 @@ export default function ProfilePage() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarError, setAvatarError] = useState("");
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
@@ -33,15 +32,22 @@ export default function ProfilePage() {
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors },
   } = useForm<ProfileInput>({
     resolver: zodResolver(profileSchema),
-    values: {
-      name: session?.user?.name ?? "",
-      email: session?.user?.email ?? "",
-      bio: session?.user?.bio ?? "",
-    },
+    defaultValues: { name: "", email: "", bio: "" },
   });
+
+  useEffect(() => {
+    if (!session?.user) return;
+
+    reset({
+      name: session.user.name ?? "",
+      email: session.user.email ?? "",
+      bio: session.user.bio ?? "",
+    });
+  }, [reset, session?.user]);
 
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     setAvatarError("");
@@ -61,41 +67,35 @@ export default function ProfilePage() {
     setAvatarPreview(URL.createObjectURL(file));
   }
 
-  async function handleAvatarUpload() {
-    if (!avatarFile) return;
-    setIsUploadingAvatar(true);
-    setAvatarError("");
-    try {
-      const formData = new FormData();
-      formData.append("avatar", avatarFile);
-
-      const res = await fetch("/api/profile/avatar", {
-        method: "PATCH",
-        body: formData,
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        setAvatarError(data?.message ?? "Tải ảnh lên thất bại");
-        return;
-      }
-
-      // Cập nhật session ngay để Header và mọi nơi khác thấy avatar mới
-      // mà không cần F5 hay đăng nhập lại
-      await update({ avatarUrl: data.avatarUrl });
-      setAvatarFile(null);
-    } catch {
-      setAvatarError("Không thể kết nối tới máy chủ");
-    } finally {
-      setIsUploadingAvatar(false);
-    }
-  }
-
   async function onSubmit(values: ProfileInput) {
     setFormError("");
     setFormSuccess("");
     setIsSaving(true);
     try {
+      let newAvatarUrl = session?.user?.avatarUrl;
+
+      // 1. Upload avatar if selected
+      if (avatarFile) {
+        const formData = new FormData();
+        formData.append("avatar", avatarFile);
+
+        const res = await fetch("/api/profile/avatar", {
+          method: "PATCH",
+          body: formData,
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          setFormError(data?.message ?? "Tải ảnh lên thất bại");
+          setIsSaving(false);
+          return;
+        }
+
+        newAvatarUrl = data.avatarUrl;
+        setAvatarFile(null); // Clear selected file after successful upload
+      }
+
+      // 2. Update profile information
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -108,7 +108,8 @@ export default function ProfilePage() {
         return;
       }
 
-      await update({ name: data.name, bio: data.bio });
+      // 3. Update session once with all changes
+      await update({ name: data.name, bio: data.bio, avatarUrl: newAvatarUrl });
       setFormSuccess("Đã lưu thay đổi");
     } catch {
       setFormError("Không thể kết nối tới máy chủ");
@@ -153,16 +154,6 @@ export default function ProfilePage() {
             onChange={handleAvatarChange}
           />
           <div className="flex flex-col gap-1">
-            {avatarFile && (
-              <Button
-                size="sm"
-                disabled={isUploadingAvatar}
-                onClick={handleAvatarUpload}
-              >
-                {isUploadingAvatar && <Loader2 className="animate-spin" />}
-                Lưu ảnh mới
-              </Button>
-            )}
             {avatarError && (
               <p className="text-sm text-destructive">{avatarError}</p>
             )}

@@ -31,8 +31,6 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
       error: undefined,
     };
   } catch {
-    // refreshToken thật sự đã chết (hết hạn 7 ngày, hoặc bị revoke) —
-    // không thể tự phục hồi nữa, đánh dấu lỗi để middleware xử lý logout
     return {
       ...token,
       accessToken: undefined,

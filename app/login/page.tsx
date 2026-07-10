@@ -25,6 +25,11 @@ import {
 } from "@/components/ui/card";
 
 const initialState: LoginState = { stage: "credentials" };
+const recaptchaDisabled = process.env.NEXT_PUBLIC_DISABLE_RECAPTCHA === "true";
+
+const recaptchaToken = recaptchaDisabled
+  ? "disabled"
+  : await getRecaptchaToken("login");
 
 export default function LoginPage() {
   const [state, formAction, isActionPending] = useActionState(
@@ -53,7 +58,14 @@ export default function LoginPage() {
 
   async function onCredentialsSubmit(values: LoginInput) {
     setStageOverride(null);
-    const recaptchaToken = await getRecaptchaToken("login");
+
+    const recaptchaDisabled =
+      process.env.NEXT_PUBLIC_DISABLE_RECAPTCHA === "true";
+
+    const recaptchaToken = recaptchaDisabled
+      ? "disabled"
+      : await getRecaptchaToken("login");
+
     const fd = new FormData();
     fd.set("step", "credentials");
     fd.set("email", values.email);
