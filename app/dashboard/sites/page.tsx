@@ -10,8 +10,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Globe,
+  FileText,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DocumentDrawer } from "@/components/dashboard/document-drawer";
+import { AgentDrawer } from "@/components/dashboard/agent-drawer";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -35,10 +39,29 @@ export default function SitesListPage() {
   // States cho Form Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  //States cho Filter
+  const [searchName, setSearchName] = useState("");
+  const [filterKbStatus, setFilterKbStatus] = useState("");
 
-  const { tableQuery, currentPage, setCurrentPage, pageCount } = useTable({
+  // States cho Document Drawer
+  const [docSiteId, setDocSiteId] = useState<string | null>(null);
+  const [docSiteName, setDocSiteName] = useState<string>("");
+
+  // States cho Agent Drawer
+  const [agentSiteId, setAgentSiteId] = useState<string | null>(null);
+  const [agentSiteName, setAgentSiteName] = useState<string>("");
+
+  const {
+    tableQuery,
+    currentPage,
+    setCurrentPage,
+    pageCount,
+    setFilters,
+    setSorters,
+  } = useTable({
     resource: "sites",
     pagination: { pageSize: 10 },
+    syncWithLocation: true,
   });
 
   const { mutate: deleteSite, mutation: deleteMutation } = useDelete();
@@ -63,6 +86,18 @@ export default function SitesListPage() {
       },
     },
   });
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      setFilters([
+        { field: "name", operator: "contains", value: searchName },
+        { field: "knowledgeBaseStatus", operator: "eq", value: filterKbStatus },
+      ]);
+      setCurrentPage(1);
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchName, filterKbStatus, setFilters, setCurrentPage]);
 
   // Tự động điền dữ liệu khi đang ở chế độ Edit và load xong
   useEffect(() => {
@@ -120,6 +155,57 @@ export default function SitesListPage() {
         </Button>
       </div>
 
+      {/* Bộ lọc (Filters) */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Input
+          placeholder="Tìm tên trang web..."
+          value={searchName}
+          onChange={(e) => setSearchName(e.target.value)}
+          className="w-56"
+        />
+        <select
+          value={filterKbStatus}
+          onChange={(e) => setFilterKbStatus(e.target.value)}
+          className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none"
+        >
+          <option value="">Tất cả Trạng thái KB</option>
+          <option value="pending">Đang xử lý (Pending)</option>
+          <option value="completed">Đã hoàn thành (Completed)</option>
+          <option value="failed">Lỗi (Failed)</option>
+        </select>
+        {/* Nút Sắp xếp */}
+        <select
+          onChange={(e) => {
+            if (!e.target.value) {
+              setSorters([]);
+            } else {
+              const [field, order] = e.target.value.split("-");
+              setSorters([{ field, order: order as "asc" | "desc" }]);
+            }
+          }}
+          className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none"
+        >
+          <option value="">Sắp xếp mặc định</option>
+          <option value="createdAt-desc">Mới nhất trước</option>
+          <option value="createdAt-asc">Cũ nhất trước</option>
+          <option value="name-asc">Tên (A-Z)</option>
+          <option value="name-desc">Tên (Z-A)</option>
+        </select>
+
+        {(searchName || filterKbStatus) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearchName("");
+              setFilterKbStatus("");
+            }}
+          >
+            Xóa bộ lọc
+          </Button>
+        )}
+      </div>
+
       {/* Bảng danh sách */}
       <div className="rounded-lg border overflow-hidden">
         <Table>
@@ -169,6 +255,28 @@ export default function SitesListPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => {
+                          setDocSiteId(site.id);
+                          setDocSiteName(site.name);
+                        }}
+                      >
+                        <FileText className="size-3.5" /> Tài liệu
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => {
+                          setAgentSiteId(site.id);
+                          setAgentSiteName(site.name);
+                        }}
+                      >
+                        <Users className="size-3.5" /> Nhân viên
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -316,6 +424,20 @@ export default function SitesListPage() {
           </div>
         </div>
       )}
+
+      {/* Document Drawer */}
+      <DocumentDrawer
+        siteId={docSiteId}
+        siteName={docSiteName}
+        onClose={() => setDocSiteId(null)}
+      />
+
+      {/* Agent Drawer */}
+      <AgentDrawer
+        siteId={agentSiteId}
+        siteName={agentSiteName}
+        onClose={() => setAgentSiteId(null)}
+      />
     </div>
   );
 }

@@ -98,6 +98,13 @@ export function RefineProvider({ children }: { children: React.ReactNode }) {
             canDelete: true,
           },
         },
+        {
+          name: "documents",
+          meta: {
+            label: "Tài liệu",
+            canDelete: true,
+          },
+        },
       ]}
       options={{
         syncWithLocation: true,
