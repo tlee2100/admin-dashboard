@@ -9,12 +9,16 @@ import {
   Users,
   UserCircle,
   LayoutDashboard,
+  Building2,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils"; // hàm merge class của Shadcn
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/users", label: "Users", icon: Users },
+  { href: "/dashboard/organizations", label: "Tổ chức", icon: Building2 },
+  { href: "/dashboard/sites", label: "Sites", icon: Globe },
   { href: "/dashboard/profile", label: "Profile", icon: UserCircle },
 ];
 
