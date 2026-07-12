@@ -127,9 +127,8 @@ export const customDataProvider = (
         headers,
       });
       await handleError(res);
-      return {
-        data: { id } as unknown as import("@refinedev/core").BaseRecord,
-      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return { data: { id } as any };
     },
   };
 };
