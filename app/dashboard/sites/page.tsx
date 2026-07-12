@@ -1,6 +1,6 @@
 "use client";
 
-import { useTable, useDelete } from "@refinedev/core";
+import { useTable, useDelete, CanAccess } from "@refinedev/core";
 import { useForm } from "@refinedev/react-hook-form";
 import { useState, useEffect } from "react";
 import {
@@ -149,10 +149,12 @@ export default function SitesListPage() {
             Tổng số: {tableQuery?.data?.total || 0} trang web
           </p>
         </div>
-        <Button className="gap-2" onClick={handleOpenCreate}>
-          <Plus className="size-4" />
-          Thêm Site mới
-        </Button>
+        <CanAccess action="create" resource="sites" fallback={null}>
+          <Button className="gap-2" onClick={handleOpenCreate}>
+            <Plus className="size-4" />
+            Thêm Site mới
+          </Button>
+        </CanAccess>
       </div>
 
       {/* Bộ lọc (Filters) */}
@@ -277,22 +279,30 @@ export default function SitesListPage() {
                       >
                         <Users className="size-3.5" /> Nhân viên
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => handleOpenEdit(site.id)}
+                      <CanAccess action="edit" resource="sites" fallback={null}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => handleOpenEdit(site.id)}
+                        >
+                          <Pencil className="size-3.5" /> Sửa
+                        </Button>
+                      </CanAccess>
+                      <CanAccess
+                        action="delete"
+                        resource="sites"
+                        fallback={null}
                       >
-                        <Pencil className="size-3.5" /> Sửa
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => setDeleteId(site.id)}
-                      >
-                        <Trash2 className="size-3.5" /> Xóa
-                      </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => setDeleteId(site.id)}
+                        >
+                          <Trash2 className="size-3.5" /> Xóa
+                        </Button>
+                      </CanAccess>
                     </div>
                   </TableCell>
                 </TableRow>

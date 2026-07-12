@@ -3,6 +3,7 @@
 import { useTable, useDelete } from "@refinedev/core";
 import { useForm } from "@refinedev/react-hook-form";
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { Pencil, Trash2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 
 export default function UsersListPage() {
+  const { data: session } = useSession();
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // States cho Form Modal
@@ -311,6 +313,35 @@ export default function UsersListPage() {
                   pattern: {
                     value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
                     message: "Email không hợp lệ",
+                  },
+                  validate: async (value) => {
+                    if (!value) return true;
+                    try {
+                      const apiUrl =
+                        process.env.NEXT_PUBLIC_API_URL ||
+                        "http://localhost:3000";
+                      const res = await fetch(
+                        `${apiUrl}/users?email=${encodeURIComponent(value)}&limit=1`,
+                        {
+                          headers: {
+                            Authorization: `Bearer ${(session as { accessToken?: string })?.accessToken}`,
+                          },
+                        },
+                      );
+                      if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.total > 0) {
+                          const userFound = data.data[0];
+                          if (editId && userFound.id === Number(editId)) {
+                            return true;
+                          }
+                          return "Email này đã được sử dụng";
+                        }
+                      }
+                    } catch (err) {
+                      console.error("Lỗi kiểm tra email:", err);
+                    }
+                    return true;
                   },
                 })}
                 placeholder="Ví dụ: email@domain.com"

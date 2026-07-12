@@ -1,6 +1,6 @@
 "use client";
 
-import { useList, useOne, useInvalidate } from "@refinedev/core";
+import { useList, useOne, useInvalidate, CanAccess } from "@refinedev/core";
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { Users as UsersIcon, Trash2, Plus, Loader2 } from "lucide-react";
@@ -165,44 +165,48 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
         </SheetHeader>
 
         {/* Add Agent Zone */}
-        <div className="mb-8 p-4 border rounded-lg bg-muted/20">
-          <h3 className="text-sm font-medium mb-3">Thêm nhân viên vào Site</h3>
-          <div className="flex gap-2">
-            <select
-              value={selectedAgentId}
-              onChange={(e) => setSelectedAgentId(e.target.value)}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={
-                isAgentsLoading || isMutating || availableAgents.length === 0
-              }
-            >
-              <option value="">
-                {isAgentsLoading
-                  ? "Đang tải..."
-                  : availableAgents.length === 0
-                    ? "Không còn nhân viên nào"
-                    : "--- Chọn nhân viên ---"}
-              </option>
-              {availableAgents.map((agent) => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.name} ({agent.email})
+        <CanAccess action="edit" resource="sites" fallback={null}>
+          <div className="mb-8 p-4 border rounded-lg bg-muted/20">
+            <h3 className="text-sm font-medium mb-3">
+              Thêm nhân viên vào Site
+            </h3>
+            <div className="flex gap-2">
+              <select
+                value={selectedAgentId}
+                onChange={(e) => setSelectedAgentId(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={
+                  isAgentsLoading || isMutating || availableAgents.length === 0
+                }
+              >
+                <option value="">
+                  {isAgentsLoading
+                    ? "Đang tải..."
+                    : availableAgents.length === 0
+                      ? "Không còn nhân viên nào"
+                      : "--- Chọn nhân viên ---"}
                 </option>
-              ))}
-            </select>
-            <Button
-              onClick={handleAssignAgent}
-              disabled={!selectedAgentId || isMutating}
-              className="shrink-0 gap-1"
-            >
-              {isMutating ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Plus className="size-4" />
-              )}{" "}
-              Thêm
-            </Button>
+                {availableAgents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name} ({agent.email})
+                  </option>
+                ))}
+              </select>
+              <Button
+                onClick={handleAssignAgent}
+                disabled={!selectedAgentId || isMutating}
+                className="shrink-0 gap-1"
+              >
+                {isMutating ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Plus className="size-4" />
+                )}{" "}
+                Thêm
+              </Button>
+            </div>
           </div>
-        </div>
+        </CanAccess>
 
         {/* Assigned Agents List */}
         <div>
@@ -250,15 +254,21 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => handleRemoveAgent(agent.id)}
-                          disabled={isMutating}
+                        <CanAccess
+                          action="edit"
+                          resource="sites"
+                          fallback={null}
                         >
-                          <Trash2 className="size-4" />
-                        </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleRemoveAgent(agent.id)}
+                            disabled={isMutating}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </CanAccess>
                       </TableCell>
                     </TableRow>
                   ))

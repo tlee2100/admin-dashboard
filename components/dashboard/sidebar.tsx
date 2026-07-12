@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { CanAccess } from "@refinedev/core";
+import React, { useEffect } from "react";
 import { useUIStore } from "@/store/ui-store";
 import {
   PanelLeftClose,
@@ -16,9 +17,14 @@ import { cn } from "@/lib/utils"; // hàm merge class của Shadcn
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/users", label: "Users", icon: Users },
-  { href: "/dashboard/organizations", label: "Tổ chức", icon: Building2 },
-  { href: "/dashboard/sites", label: "Sites", icon: Globe },
+  { href: "/dashboard/users", label: "Users", icon: Users, resource: "users" },
+  {
+    href: "/dashboard/organizations",
+    label: "Tổ chức",
+    icon: Building2,
+    resource: "organizations",
+  },
+  { href: "/dashboard/sites", label: "Sites", icon: Globe, resource: "sites" },
   { href: "/dashboard/profile", label: "Profile", icon: UserCircle },
 ];
 
@@ -63,12 +69,13 @@ export function Sidebar() {
         )}
       </button>
       <nav className="flex flex-col gap-1 p-2 mt-2">
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {navItems.map(({ href, label, icon: Icon, resource }) => {
           const active =
             href === "/dashboard"
               ? pathname === "/dashboard"
               : pathname.startsWith(href);
-          return (
+
+          const linkNode = (
             <Link
               key={href}
               href={href}
@@ -85,6 +92,21 @@ export function Sidebar() {
               {sidebarOpen && <span>{label}</span>}
             </Link>
           );
+
+          if (resource) {
+            return (
+              <CanAccess
+                key={href}
+                resource={resource}
+                action="list"
+                fallback={null}
+              >
+                {linkNode}
+              </CanAccess>
+            );
+          }
+
+          return <React.Fragment key={href}>{linkNode}</React.Fragment>;
         })}
       </nav>
     </aside>

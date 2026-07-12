@@ -1,7 +1,11 @@
 "use client";
 
 import React from "react";
-import { Refine, type AuthProvider } from "@refinedev/core";
+import {
+  Refine,
+  type AuthProvider,
+  type AccessControlProvider,
+} from "@refinedev/core";
 import routerProvider from "@refinedev/nextjs-router";
 import { useSession, signOut } from "next-auth/react";
 import { customDataProvider } from "./data-provider";
@@ -59,10 +63,40 @@ export function RefineProvider({ children }: { children: React.ReactNode }) {
     },
   };
 
+  const accessControlProvider: AccessControlProvider = {
+    can: async ({ resource, action }) => {
+      const role = session?.user?.role?.toUpperCase();
+
+      if (role === "SUPER_ADMIN" || role === "ADMIN") {
+        return { can: true };
+      }
+
+      if (role === "AGENT") {
+        if (resource === "users" || resource === "organizations") {
+          return { can: false, reason: "Unauthorized" };
+        }
+
+        if (resource === "sites") {
+          if (action === "create" || action === "edit" || action === "delete") {
+            return { can: false, reason: "Unauthorized" };
+          }
+          return { can: true };
+        }
+
+        if (resource === "documents") {
+          return { can: true };
+        }
+      }
+
+      return { can: false, reason: "Unauthorized" };
+    },
+  };
+
   return (
     <Refine
       routerProvider={routerProvider}
       authProvider={authProvider} //Truyền authProvider
+      accessControlProvider={accessControlProvider}
       dataProvider={customDataProvider(
         process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000",
         session?.accessToken as string,
