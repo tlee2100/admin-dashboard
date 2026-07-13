@@ -55,11 +55,11 @@ export default function ProfilePage() {
     if (!file) return;
 
     if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
-      setAvatarError("Chỉ chấp nhận ảnh JPEG, PNG hoặc WEBP");
+      setAvatarError("Only JPEG, PNG or WEBP images are accepted");
       return;
     }
     if (file.size > MAX_AVATAR_SIZE) {
-      setAvatarError("Ảnh tối đa 2MB");
+      setAvatarError("Image must be 2MB or less");
       return;
     }
 
@@ -86,7 +86,7 @@ export default function ProfilePage() {
         const data = await res.json();
 
         if (!res.ok) {
-          setFormError(data?.message ?? "Tải ảnh lên thất bại");
+          setFormError(data?.message ?? "Failed to upload avatar");
           setIsSaving(false);
           return;
         }
@@ -104,15 +104,15 @@ export default function ProfilePage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setFormError(data?.message ?? "Cập nhật thất bại");
+        setFormError(data?.message ?? "Update failed");
         return;
       }
 
       // 3. Update session once with all changes
       await update({ name: data.name, bio: data.bio, avatarUrl: newAvatarUrl });
-      setFormSuccess("Đã lưu thay đổi");
+      setFormSuccess("Changes saved successfully");
     } catch {
-      setFormError("Không thể kết nối tới máy chủ");
+      setFormError("Unable to connect to the server");
     } finally {
       setIsSaving(false);
     }
@@ -128,7 +128,7 @@ export default function ProfilePage() {
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Ảnh đại diện</CardTitle>
+          <CardTitle>Profile Picture</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center gap-4">
           <button
@@ -158,7 +158,7 @@ export default function ProfilePage() {
               <p className="text-sm text-destructive">{avatarError}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              JPEG, PNG hoặc WEBP, tối đa 2MB
+              JPEG, PNG or WEBP, max 2MB
             </p>
           </div>
         </CardContent>
@@ -166,12 +166,12 @@ export default function ProfilePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Thông tin cá nhân</CardTitle>
+          <CardTitle>Personal Information</CardTitle>
         </CardHeader>
         <form onSubmit={handleSubmit(onSubmit)}>
           <CardContent className="flex flex-col gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium">Tên</label>
+              <label className="mb-1 block text-sm font-medium">Name</label>
               <Input {...register("name")} />
               {errors.name && (
                 <p className="mt-1 text-sm text-destructive">
@@ -189,9 +189,7 @@ export default function ProfilePage() {
               )}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">
-                Giới thiệu
-              </label>
+              <label className="mb-1 block text-sm font-medium">Bio</label>
               <Textarea {...register("bio")} rows={3} />
               {errors.bio && (
                 <p className="mt-1 text-sm text-destructive">
@@ -209,7 +207,7 @@ export default function ProfilePage() {
           <div className="flex justify-end p-6 pt-0">
             <Button type="submit" disabled={isSaving}>
               {isSaving && <Loader2 className="animate-spin" />}
-              Lưu thay đổi
+              Save changes
             </Button>
           </div>
         </form>

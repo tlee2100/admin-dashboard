@@ -32,11 +32,11 @@ export function NotificationBell() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Thông báo</DropdownMenuLabel>
+          <DropdownMenuLabel>Notifications</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {notifications.length === 0 ? (
             <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-              Chưa có thông báo nào
+              No notifications yet
             </div>
           ) : (
             notifications.map((n) => (

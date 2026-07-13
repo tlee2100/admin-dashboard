@@ -1,7 +1,8 @@
 "use client";
 
-import { useTable, useDelete, CanAccess } from "@refinedev/core";
+import { useTable, useDelete, CanAccess, useSelect } from "@refinedev/core";
 import { useForm } from "@refinedev/react-hook-form";
+import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 import {
   Pencil,
@@ -66,9 +67,25 @@ export default function SitesListPage() {
 
   const { mutate: deleteSite, mutation: deleteMutation } = useDelete();
   const isDeleting = deleteMutation?.isPending;
-  type SiteRecord = { id: string; name: string; url: string };
+  type SiteRecord = {
+    id: string;
+    name: string;
+    url: string;
+    organization?: { id: number; name: string };
+  };
   const sites = (tableQuery?.data?.data as unknown as SiteRecord[]) || [];
 
+  const { data: session } = useSession();
+  const isSuperAdmin = session?.user?.role?.toUpperCase() === "SUPER_ADMIN";
+
+  const { options: orgOptions } = useSelect({
+    resource: "organizations",
+    optionLabel: "name",
+    optionValue: "id",
+    queryOptions: {
+      enabled: isSuperAdmin,
+    },
+  });
   // Form setup cho Create / Edit
   const {
     refineCore: { onFinish, formLoading, query },
@@ -87,6 +104,14 @@ export default function SitesListPage() {
     },
   });
 
+  const handleCustomSubmit = (data: Record<string, unknown>) => {
+    const payload = { ...data };
+    if (payload.organizationId === "") {
+      delete payload.organizationId;
+    }
+    onFinish(payload);
+  };
+
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       setFilters([
@@ -102,17 +127,22 @@ export default function SitesListPage() {
   // Tự động điền dữ liệu khi đang ở chế độ Edit và load xong
   useEffect(() => {
     if (editId && query?.data?.data) {
-      const site = query.data.data as { name: string; url: string };
+      const site = query.data.data as {
+        name: string;
+        url: string;
+        organizationId?: number;
+      };
       reset({
         name: site.name,
         url: site.url,
+        organizationId: site.organizationId || "",
       });
     }
   }, [editId, query?.data?.data, reset]);
 
   const handleOpenCreate = () => {
     setEditId(null);
-    reset({ name: "", url: "" });
+    reset({ name: "", url: "", organizationId: "" });
     setIsModalOpen(true);
   };
 
@@ -126,7 +156,7 @@ export default function SitesListPage() {
     setIsModalOpen(false);
     setTimeout(() => {
       setEditId(null);
-      reset({ name: "", url: "" });
+      reset({ name: "", url: "", organizationId: "" });
     }, 200); // delay để tránh giật UI khi modal đang đóng
   };
 
@@ -144,15 +174,15 @@ export default function SitesListPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Quản lý Sites</h1>
+          <h1 className="text-2xl font-bold">Sites Management</h1>
           <p className="text-sm text-muted-foreground">
-            Tổng số: {tableQuery?.data?.total || 0} trang web
+            Total: {tableQuery?.data?.total || 0} websites
           </p>
         </div>
         <CanAccess action="create" resource="sites" fallback={null}>
           <Button className="gap-2" onClick={handleOpenCreate}>
             <Plus className="size-4" />
-            Thêm Site mới
+            Add New Site
           </Button>
         </CanAccess>
       </div>
@@ -160,7 +190,7 @@ export default function SitesListPage() {
       {/* Bộ lọc (Filters) */}
       <div className="flex flex-wrap items-center gap-3">
         <Input
-          placeholder="Tìm tên trang web..."
+          placeholder="Search website name..."
           value={searchName}
           onChange={(e) => setSearchName(e.target.value)}
           className="w-56"
@@ -170,12 +200,12 @@ export default function SitesListPage() {
           onChange={(e) => setFilterKbStatus(e.target.value)}
           className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none"
         >
-          <option value="">Tất cả Trạng thái KB</option>
-          <option value="pending">Đang xử lý (Pending)</option>
-          <option value="completed">Đã hoàn thành (Completed)</option>
-          <option value="failed">Lỗi (Failed)</option>
+          <option value="">All KB Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="processing">Processing</option>
+          <option value="ready">Ready</option>
         </select>
-        {/* Nút Sắp xếp */}
+        {/* Sort button */}
         <select
           onChange={(e) => {
             if (!e.target.value) {
@@ -187,11 +217,11 @@ export default function SitesListPage() {
           }}
           className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none"
         >
-          <option value="">Sắp xếp mặc định</option>
-          <option value="createdAt-desc">Mới nhất trước</option>
-          <option value="createdAt-asc">Cũ nhất trước</option>
-          <option value="name-asc">Tên (A-Z)</option>
-          <option value="name-desc">Tên (Z-A)</option>
+          <option value="">Default sort</option>
+          <option value="createdAt-desc">Newest first</option>
+          <option value="createdAt-asc">Oldest first</option>
+          <option value="name-asc">Name (A-Z)</option>
+          <option value="name-desc">Name (Z-A)</option>
         </select>
 
         {(searchName || filterKbStatus) && (
@@ -203,7 +233,7 @@ export default function SitesListPage() {
               setFilterKbStatus("");
             }}
           >
-            Xóa bộ lọc
+            Clear filters
           </Button>
         )}
       </div>
@@ -213,28 +243,29 @@ export default function SitesListPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead>Tên trang web</TableHead>
+              <TableHead>Website Name</TableHead>
               <TableHead>URL</TableHead>
-              <TableHead>Hành động</TableHead>
+              <TableHead>Organization</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {tableQuery?.isLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={3}
+                  colSpan={4}
                   className="text-center py-8 text-muted-foreground"
                 >
-                  Đang tải dữ liệu...
+                  Loading data...
                 </TableCell>
               </TableRow>
             ) : sites.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={3}
+                  colSpan={4}
                   className="text-center py-8 text-muted-foreground"
                 >
-                  Không tìm thấy trang web nào
+                  No websites found
                 </TableCell>
               </TableRow>
             ) : (
@@ -256,6 +287,17 @@ export default function SitesListPage() {
                     </a>
                   </TableCell>
                   <TableCell>
+                    {site.organization?.name ? (
+                      <span className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 font-normal">
+                        {site.organization.name}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground italic text-xs">
+                        None
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
@@ -266,7 +308,7 @@ export default function SitesListPage() {
                           setDocSiteName(site.name);
                         }}
                       >
-                        <FileText className="size-3.5" /> Tài liệu
+                        <FileText className="size-3.5" /> Documents
                       </Button>
                       <Button
                         variant="outline"
@@ -277,7 +319,7 @@ export default function SitesListPage() {
                           setAgentSiteName(site.name);
                         }}
                       >
-                        <Users className="size-3.5" /> Nhân viên
+                        <Users className="size-3.5" /> Agents
                       </Button>
                       <CanAccess action="edit" resource="sites" fallback={null}>
                         <Button
@@ -286,7 +328,7 @@ export default function SitesListPage() {
                           className="gap-1.5"
                           onClick={() => handleOpenEdit(site.id)}
                         >
-                          <Pencil className="size-3.5" /> Sửa
+                          <Pencil className="size-3.5" /> Edit
                         </Button>
                       </CanAccess>
                       <CanAccess
@@ -300,7 +342,7 @@ export default function SitesListPage() {
                           className="gap-1.5"
                           onClick={() => setDeleteId(site.id)}
                         >
-                          <Trash2 className="size-3.5" /> Xóa
+                          <Trash2 className="size-3.5" /> Delete
                         </Button>
                       </CanAccess>
                     </div>
@@ -315,7 +357,7 @@ export default function SitesListPage() {
       {/* Phân trang */}
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>
-          Trang {currentPage} / {pageCount}
+          Page {currentPage} / {pageCount}
         </span>
         <div className="flex gap-2">
           <Button
@@ -325,7 +367,7 @@ export default function SitesListPage() {
             onClick={() => setCurrentPage((currentPage ?? 1) - 1)}
             className="gap-1"
           >
-            <ChevronLeft className="size-4" /> Trước
+            <ChevronLeft className="size-4" /> Previous
           </Button>
           <Button
             variant="outline"
@@ -334,7 +376,7 @@ export default function SitesListPage() {
             onClick={() => setCurrentPage((currentPage ?? 1) + 1)}
             className="gap-1"
           >
-            Tiếp <ChevronRight className="size-4" />
+            Next <ChevronRight className="size-4" />
           </Button>
         </div>
       </div>
@@ -346,22 +388,20 @@ export default function SitesListPage() {
       >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>
-              {editId ? "Chỉnh sửa Site" : "Thêm Site mới"}
-            </DialogTitle>
+            <DialogTitle>{editId ? "Edit Site" : "Add New Site"}</DialogTitle>
           </DialogHeader>
 
           <form
-            onSubmit={handleSubmit(onFinish)}
+            onSubmit={handleSubmit(handleCustomSubmit)}
             className="flex flex-col gap-4 mt-4"
           >
             <div className="space-y-2">
-              <label className="text-sm font-medium">Tên trang web</label>
+              <label className="text-sm font-medium">Website Name</label>
               <Input
                 {...register("name", {
-                  required: "Vui lòng nhập tên trang web",
+                  required: "Please enter a website name",
                 })}
-                placeholder="Ví dụ: My Awesome Site"
+                placeholder="e.g. My Awesome Site"
               />
               {errors.name && (
                 <span className="text-xs text-destructive">
@@ -371,18 +411,18 @@ export default function SitesListPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Đường dẫn URL</label>
+              <label className="text-sm font-medium">URL Path</label>
               <Input
                 type="url"
                 {...register("url", {
-                  required: "Vui lòng nhập đường dẫn URL",
+                  required: "Please enter a URL path",
                   pattern: {
                     value:
                       /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/,
-                    message: "URL không hợp lệ (ví dụ: https://example.com)",
+                    message: "Invalid URL (e.g. https://example.com)",
                   },
                 })}
-                placeholder="Ví dụ: https://www.example.com"
+                placeholder="e.g. https://www.example.com"
               />
               {errors.url && (
                 <span className="text-xs text-destructive">
@@ -391,19 +431,38 @@ export default function SitesListPage() {
               )}
             </div>
 
+            {isSuperAdmin && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Organization</label>
+                <select
+                  {...register("organizationId", {
+                    setValueAs: (v) => (v === "" ? null : Number(v)),
+                  })}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <option value="">None (Standalone)</option>
+                  {orgOptions.map((org) => (
+                    <option key={org.value} value={org.value}>
+                      {org.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <DialogFooter className="mt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleCloseModal}
               >
-                Hủy
+                Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={formLoading || (editId ? query?.isLoading : false)}
               >
-                {formLoading ? "Đang lưu..." : "Lưu thay đổi"}
+                {formLoading ? "Saving..." : "Save changes"}
               </Button>
             </DialogFooter>
           </form>
@@ -414,21 +473,21 @@ export default function SitesListPage() {
       {deleteId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
           <div className="bg-background rounded-xl p-6 shadow-xl w-[340px] flex flex-col gap-4">
-            <h3 className="font-semibold text-lg">Xác nhận xóa</h3>
+            <h3 className="font-semibold text-lg">Confirm Deletion</h3>
             <p className="text-sm text-muted-foreground">
-              Bạn có chắc chắn muốn xóa trang web này không? Hành động này không
-              thể hoàn tác.
+              Are you sure you want to delete this website? This action cannot
+              be undone.
             </p>
             <div className="flex gap-3 justify-end">
               <Button variant="outline" onClick={() => setDeleteId(null)}>
-                Hủy
+                Cancel
               </Button>
               <Button
                 variant="destructive"
                 disabled={isDeleting}
                 onClick={() => handleDelete(deleteId)}
               >
-                {isDeleting ? "Đang xóa..." : "Xóa"}
+                {isDeleting ? "Deleting..." : "Delete"}
               </Button>
             </div>
           </div>

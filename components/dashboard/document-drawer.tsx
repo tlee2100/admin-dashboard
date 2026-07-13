@@ -145,7 +145,7 @@ export function DocumentDrawer({
     });
 
   const handleDelete = (id: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa tài liệu này?")) {
+    if (confirm("Are you sure you want to delete this document?")) {
       deleteDoc(
         {
           resource: "documents",
@@ -163,19 +163,19 @@ export function DocumentDrawer({
       case "PENDING":
         return (
           <Badge variant="outline" className="text-yellow-600 bg-yellow-50">
-            <Loader2 className="mr-1 size-3 animate-spin" /> Đang xử lý
+            <Loader2 className="mr-1 size-3 animate-spin" /> Processing
           </Badge>
         );
       case "READY":
         return (
           <Badge variant="outline" className="text-green-600 bg-green-50">
-            <CheckCircle className="mr-1 size-3" /> Hoàn thành
+            <CheckCircle className="mr-1 size-3" /> Ready
           </Badge>
         );
       case "FAILED":
         return (
           <Badge variant="outline" className="text-red-600 bg-red-50">
-            <AlertCircle className="mr-1 size-3" /> Lỗi
+            <AlertCircle className="mr-1 size-3" /> Failed
           </Badge>
         );
       default:
@@ -187,16 +187,16 @@ export function DocumentDrawer({
     <Sheet open={!!siteId} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="sm:max-w-xl overflow-y-auto">
         <SheetHeader className="mb-6">
-          <SheetTitle>Quản lý tài liệu</SheetTitle>
+          <SheetTitle>Document Management</SheetTitle>
           <SheetDescription>
-            Tài liệu huấn luyện cho trang web:{" "}
+            Training documents for website:{" "}
             <span className="font-semibold text-foreground">{siteName}</span>
           </SheetDescription>
         </SheetHeader>
 
         {/* Upload Zone */}
         <div className="mb-8">
-          <h3 className="text-sm font-medium mb-3">Tải lên tài liệu mới</h3>
+          <h3 className="text-sm font-medium mb-3">Upload new documents</h3>
           <div
             {...getRootProps()}
             className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
@@ -209,28 +209,28 @@ export function DocumentDrawer({
             {isUploading ? (
               <div className="flex flex-col items-center gap-2 text-muted-foreground">
                 <Loader2 className="size-8 animate-spin text-primary" />
-                <p>Đang tải tài liệu lên...</p>
+                <p>Uploading documents...</p>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2 text-muted-foreground">
                 <UploadCloud className="size-8 mb-2 text-muted-foreground/50" />
                 <p className="font-medium text-foreground">
-                  Kéo thả file vào đây, hoặc click để chọn file
+                  Drag &amp; drop files here, or click to select files
                 </p>
-                <p className="text-sm">Hỗ trợ: PDF, TXT (Tối đa 10MB)</p>
+                <p className="text-sm">Supports: PDF, TXT (Max 10MB)</p>
               </div>
             )}
           </div>
           {fileRejections.length > 0 && (
             <p className="text-sm text-destructive mt-2 flex items-center gap-1">
               <AlertCircle className="size-4" />
-              File không hợp lệ hoặc quá 10MB!
+              Invalid file or exceeds 10MB!
             </p>
           )}
           {uploadError && (
             <p className="text-sm text-destructive mt-2 flex items-center gap-1">
               <AlertCircle className="size-4" />
-              Lỗi: {uploadError}
+              Error: {uploadError}
             </p>
           )}
 
@@ -238,7 +238,7 @@ export function DocumentDrawer({
           {stagedFiles.length > 0 && (
             <div className="mt-4">
               <h4 className="text-sm font-medium mb-2">
-                File chờ tải lên ({stagedFiles.length})
+                Files pending upload ({stagedFiles.length})
               </h4>
               <ul className="space-y-2 mb-4">
                 {stagedFiles.map((file, index) => (
@@ -272,11 +272,11 @@ export function DocumentDrawer({
               >
                 {isUploading ? (
                   <>
-                    <Loader2 className="size-4 animate-spin" /> Đang tải lên...
+                    <Loader2 className="size-4 animate-spin" /> Uploading...
                   </>
                 ) : (
                   <>
-                    <UploadCloud className="size-4" /> Xác nhận tải lên
+                    <UploadCloud className="size-4" /> Confirm Upload
                   </>
                 )}
               </Button>
@@ -287,9 +287,9 @@ export function DocumentDrawer({
         {/* Document List */}
         <div>
           <h3 className="text-sm font-medium mb-3 flex items-center justify-between">
-            <span>Danh sách tài liệu đã tải lên</span>
+            <span>Uploaded Documents</span>
             <span className="text-muted-foreground font-normal text-xs">
-              {documents.length} tài liệu
+              {documents.length} documents
             </span>
           </h3>
 
@@ -297,9 +297,9 @@ export function DocumentDrawer({
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
-                  <TableHead>Tên file</TableHead>
-                  <TableHead className="w-[120px]">Trạng thái</TableHead>
-                  <TableHead className="w-[70px] text-right">Xóa</TableHead>
+                  <TableHead>Filename</TableHead>
+                  <TableHead className="w-[120px]">Status</TableHead>
+                  <TableHead className="w-[70px] text-right">Delete</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -309,7 +309,7 @@ export function DocumentDrawer({
                       colSpan={3}
                       className="text-center py-6 text-muted-foreground text-sm"
                     >
-                      Đang tải danh sách...
+                      Loading list...
                     </TableCell>
                   </TableRow>
                 ) : documents.length === 0 ? (
@@ -318,7 +318,7 @@ export function DocumentDrawer({
                       colSpan={3}
                       className="text-center py-6 text-muted-foreground text-sm"
                     >
-                      Chưa có tài liệu nào.
+                      No documents yet.
                     </TableCell>
                   </TableRow>
                 ) : (

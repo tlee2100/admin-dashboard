@@ -1,6 +1,6 @@
 "use client";
 
-import { useTable, useDelete } from "@refinedev/core";
+import { useTable, useDelete, useSelect } from "@refinedev/core";
 import { useForm } from "@refinedev/react-hook-form";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
@@ -45,9 +45,25 @@ export default function UsersListPage() {
 
   const { mutate: deleteUser, mutation: deleteMutation } = useDelete();
   const isDeleting = deleteMutation?.isPending;
-  type UserRecord = { id: string; name: string; email: string; role: string };
+  type UserRecord = {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    organization?: { id: number; name: string };
+  };
   const users = (tableQuery?.data?.data as unknown as UserRecord[]) || [];
 
+  const isSuperAdmin = session?.user?.role?.toUpperCase() === "SUPER_ADMIN";
+
+  const { options: orgOptions } = useSelect({
+    resource: "organizations",
+    optionLabel: "name",
+    optionValue: "id",
+    queryOptions: {
+      enabled: isSuperAdmin, // Only fetch orgs if superadmin
+    },
+  });
   // Form setup cho Create / Edit
   const {
     refineCore: { onFinish, formLoading, query },
@@ -66,6 +82,20 @@ export default function UsersListPage() {
     },
   });
 
+  const handleCustomSubmit = (data: Record<string, unknown>) => {
+    const payload = { ...data };
+    if (payload.password === "") {
+      delete payload.password;
+    }
+    if (payload.organizationId === "") {
+      delete payload.organizationId;
+    }
+    if (!editId) {
+      delete payload.role;
+    }
+    onFinish(payload);
+  };
+
   // Tự động điền dữ liệu khi đang ở chế độ Edit và load xong
   useEffect(() => {
     if (editId && query?.data?.data) {
@@ -73,33 +103,49 @@ export default function UsersListPage() {
         name: string;
         email: string;
         role: string;
+        organizationId?: number;
       };
       reset({
         name: user.name,
         email: user.email,
         role: user.role,
+        organizationId: user.organizationId || "",
         password: "", // không hiện password cũ
       });
     }
   }, [editId, query?.data?.data, reset]);
 
-  // (Debounce) cho bộ lọc
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      setFilters([
-        { field: "name", operator: "eq", value: searchName },
-        { field: "email", operator: "eq", value: searchEmail },
-        { field: "role", operator: "eq", value: searchRole },
-      ]);
-      setCurrentPage(1); // Reset về trang 1 khi lọc thay đổi
-    }, 300);
+  const [debouncedName, setDebouncedName] = useState("");
+  const [debouncedEmail, setDebouncedEmail] = useState("");
 
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchName, searchEmail, searchRole, setFilters, setCurrentPage]);
+  // Debounce text inputs (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedName(searchName);
+      setDebouncedEmail(searchEmail);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchName, searchEmail]);
+
+  // Apply filters instantly when debounced text OR searchRole changes
+  useEffect(() => {
+    setFilters([
+      { field: "name", operator: "eq", value: debouncedName },
+      { field: "email", operator: "eq", value: debouncedEmail },
+      { field: "role", operator: "eq", value: searchRole },
+    ]);
+    setCurrentPage(1); // Reset về trang 1 khi lọc thay đổi
+  }, [debouncedName, debouncedEmail, searchRole, setFilters, setCurrentPage]);
 
   const handleOpenCreate = () => {
     setEditId(null);
-    reset({ name: "", email: "", password: "", role: "user" });
+    reset({
+      name: "",
+      email: "",
+      password: "",
+      role: "agent",
+      organizationId: "",
+    });
     setIsModalOpen(true);
   };
 
@@ -112,7 +158,13 @@ export default function UsersListPage() {
     setIsModalOpen(false);
     setTimeout(() => {
       setEditId(null);
-      reset({ name: "", email: "", password: "", role: "user" });
+      reset({
+        name: "",
+        email: "",
+        password: "",
+        role: "agent",
+        organizationId: "",
+      });
     }, 200); // delay để tránh giật UI khi modal đang đóng
   };
 
@@ -136,27 +188,27 @@ export default function UsersListPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Quản lý Người dùng</h1>
+          <h1 className="text-2xl font-bold">User Management</h1>
           <p className="text-sm text-muted-foreground">
-            Tổng số: {tableQuery?.data?.total || 0} thành viên
+            Total: {tableQuery?.data?.total || 0} members
           </p>
         </div>
         <Button className="gap-2" onClick={handleOpenCreate}>
           <Plus className="size-4" />
-          Thêm mới
+          Add New
         </Button>
       </div>
 
       {/* Bộ lọc (Filters) */}
       <div className="flex flex-wrap items-center gap-3">
         <Input
-          placeholder="Tìm theo tên..."
+          placeholder="Search by name..."
           value={searchName}
           onChange={(e) => setSearchName(e.target.value)}
           className="w-48"
         />
         <Input
-          placeholder="Tìm theo email..."
+          placeholder="Search by email..."
           value={searchEmail}
           onChange={(e) => setSearchEmail(e.target.value)}
           className="w-48"
@@ -166,14 +218,14 @@ export default function UsersListPage() {
           onChange={(e) => setSearchRole(e.target.value)}
           className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-ring dark:bg-zinc-900"
         >
-          <option value="">Tất cả quyền hạn</option>
+          <option value="">All roles</option>
           <option value="admin">Admin</option>
           <option value="agent">Agent</option>
         </select>
 
         {(searchName || searchEmail || searchRole) && (
           <Button variant="ghost" size="sm" onClick={handleClearFilters}>
-            Xóa bộ lọc
+            Clear filters
           </Button>
         )}
       </div>
@@ -183,29 +235,30 @@ export default function UsersListPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead>Tên</TableHead>
+              <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
-              <TableHead>Quyền hạn</TableHead>
-              <TableHead>Hành động</TableHead>
+              <TableHead>Organization</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {tableQuery?.isLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={4}
+                  colSpan={5}
                   className="text-center py-8 text-muted-foreground"
                 >
-                  Đang tải dữ liệu...
+                  Loading data...
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={4}
+                  colSpan={5}
                   className="text-center py-8 text-muted-foreground"
                 >
-                  Không tìm thấy người dùng nào
+                  No users found
                 </TableCell>
               </TableRow>
             ) : (
@@ -216,6 +269,17 @@ export default function UsersListPage() {
                 >
                   <TableCell className="font-medium">{user.name}</TableCell>
                   <TableCell>{user.email}</TableCell>
+                  <TableCell>
+                    {user.organization?.name ? (
+                      <Badge variant="secondary" className="font-normal">
+                        {user.organization.name}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground italic text-xs">
+                        None
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="capitalize">
                       {user.role}
@@ -229,7 +293,7 @@ export default function UsersListPage() {
                         className="gap-1.5"
                         onClick={() => handleOpenEdit(user.id)}
                       >
-                        <Pencil className="size-3.5" /> Sửa
+                        <Pencil className="size-3.5" /> Edit
                       </Button>
                       <Button
                         variant="destructive"
@@ -237,7 +301,7 @@ export default function UsersListPage() {
                         className="gap-1.5"
                         onClick={() => setDeleteId(user.id)}
                       >
-                        <Trash2 className="size-3.5" /> Xóa
+                        <Trash2 className="size-3.5" /> Delete
                       </Button>
                     </div>
                   </TableCell>
@@ -251,7 +315,7 @@ export default function UsersListPage() {
       {/* Phân trang */}
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>
-          Trang {currentPage} / {pageCount}
+          Page {currentPage} / {pageCount}
         </span>
         <div className="flex gap-2">
           <Button
@@ -261,7 +325,7 @@ export default function UsersListPage() {
             onClick={() => setCurrentPage((currentPage ?? 1) - 1)}
             className="gap-1"
           >
-            <ChevronLeft className="size-4" /> Trước
+            <ChevronLeft className="size-4" /> Previous
           </Button>
           <Button
             variant="outline"
@@ -270,7 +334,7 @@ export default function UsersListPage() {
             onClick={() => setCurrentPage((currentPage ?? 1) + 1)}
             className="gap-1"
           >
-            Tiếp <ChevronRight className="size-4" />
+            Next <ChevronRight className="size-4" />
           </Button>
         </div>
       </div>
@@ -282,20 +346,20 @@ export default function UsersListPage() {
       >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>
-              {editId ? "Chỉnh sửa Người dùng" : "Thêm Người dùng mới"}
-            </DialogTitle>
+            <DialogTitle>{editId ? "Edit User" : "Add New User"}</DialogTitle>
           </DialogHeader>
 
           <form
-            onSubmit={handleSubmit(onFinish)}
+            onSubmit={handleSubmit(handleCustomSubmit)}
             className="flex flex-col gap-4 mt-4"
           >
             <div className="space-y-2">
-              <label className="text-sm font-medium">Họ và Tên</label>
+              <label className="text-sm font-medium">Full Name</label>
               <Input
-                {...register("name", { required: "Vui lòng nhập họ và tên" })}
-                placeholder="Ví dụ: Nguyễn Văn A"
+                {...register("name", {
+                  required: "Please enter your full name",
+                })}
+                placeholder="e.g. John Smith"
               />
               {errors.name && (
                 <span className="text-xs text-destructive">
@@ -309,10 +373,10 @@ export default function UsersListPage() {
               <Input
                 type="email"
                 {...register("email", {
-                  required: "Vui lòng nhập email",
+                  required: "Please enter an email address",
                   pattern: {
                     value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                    message: "Email không hợp lệ",
+                    message: "Invalid email address",
                   },
                   validate: async (value) => {
                     if (!value) return true;
@@ -335,16 +399,16 @@ export default function UsersListPage() {
                           if (editId && userFound.id === Number(editId)) {
                             return true;
                           }
-                          return "Email này đã được sử dụng";
+                          return "This email is already in use";
                         }
                       }
                     } catch (err) {
-                      console.error("Lỗi kiểm tra email:", err);
+                      console.error("Email check error:", err);
                     }
                     return true;
                   },
                 })}
-                placeholder="Ví dụ: email@domain.com"
+                placeholder="e.g. email@domain.com"
               />
               {errors.email && (
                 <span className="text-xs text-destructive">
@@ -355,18 +419,20 @@ export default function UsersListPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">
-                {editId ? "Mật khẩu mới (Để trống nếu không đổi)" : "Mật khẩu"}
+                {editId
+                  ? "New Password (Leave blank to keep current)"
+                  : "Password"}
               </label>
               <Input
                 type="password"
                 {...register("password", {
-                  required: editId ? false : "Vui lòng nhập mật khẩu",
+                  required: editId ? false : "Please enter a password",
                   minLength: {
                     value: 6,
-                    message: "Mật khẩu phải dài ít nhất 6 ký tự",
+                    message: "Password must be at least 6 characters",
                   },
                 })}
-                placeholder="Nhập ít nhất 6 ký tự"
+                placeholder="Enter at least 6 characters"
               />
               {errors.password && (
                 <span className="text-xs text-destructive">
@@ -377,14 +443,33 @@ export default function UsersListPage() {
 
             {editId && (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Quyền hạn</label>
+                <label className="text-sm font-medium">Role</label>
                 <select
                   {...register("role")}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <option value="user">User</option>
+                  <option value="super_admin">Super Admin</option>
                   <option value="admin">Admin</option>
                   <option value="agent">Agent</option>
+                </select>
+              </div>
+            )}
+
+            {isSuperAdmin && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Organization</label>
+                <select
+                  {...register("organizationId", {
+                    setValueAs: (v) => (v === "" ? null : Number(v)),
+                  })}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <option value="">None (Standalone)</option>
+                  {orgOptions.map((org) => (
+                    <option key={org.value} value={org.value}>
+                      {org.label}
+                    </option>
+                  ))}
                 </select>
               </div>
             )}
@@ -395,13 +480,13 @@ export default function UsersListPage() {
                 variant="outline"
                 onClick={handleCloseModal}
               >
-                Hủy
+                Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={formLoading || (editId ? query?.isLoading : false)}
               >
-                {formLoading ? "Đang lưu..." : "Lưu thay đổi"}
+                {formLoading ? "Saving..." : "Save changes"}
               </Button>
             </DialogFooter>
           </form>
@@ -412,21 +497,21 @@ export default function UsersListPage() {
       {deleteId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
           <div className="bg-background rounded-xl p-6 shadow-xl w-[340px] flex flex-col gap-4">
-            <h3 className="font-semibold text-lg">Xác nhận xóa</h3>
+            <h3 className="font-semibold text-lg">Confirm Deletion</h3>
             <p className="text-sm text-muted-foreground">
-              Bạn có chắc chắn muốn xóa thành viên này không? Hành động này
-              không thể hoàn tác.
+              Are you sure you want to delete this member? This action cannot be
+              undone.
             </p>
             <div className="flex gap-3 justify-end">
               <Button variant="outline" onClick={() => setDeleteId(null)}>
-                Hủy
+                Cancel
               </Button>
               <Button
                 variant="destructive"
                 disabled={isDeleting}
                 onClick={() => handleDelete(deleteId)}
               >
-                {isDeleting ? "Đang xóa..." : "Xóa"}
+                {isDeleting ? "Deleting..." : "Delete"}
               </Button>
             </div>
           </div>

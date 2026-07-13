@@ -5,10 +5,12 @@ import {
   Refine,
   type AuthProvider,
   type AccessControlProvider,
+  type NotificationProvider,
 } from "@refinedev/core";
 import routerProvider from "@refinedev/nextjs-router";
 import { useSession, signOut } from "next-auth/react";
 import { customDataProvider } from "./data-provider";
+import { toast } from "sonner";
 
 export function RefineProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -67,7 +69,14 @@ export function RefineProvider({ children }: { children: React.ReactNode }) {
     can: async ({ resource, action }) => {
       const role = session?.user?.role?.toUpperCase();
 
-      if (role === "SUPER_ADMIN" || role === "ADMIN") {
+      if (role === "SUPER_ADMIN") {
+        return { can: true };
+      }
+
+      if (role === "ADMIN") {
+        if (resource === "organizations") {
+          return { can: false, reason: "Unauthorized" };
+        }
         return { can: true };
       }
 
@@ -92,11 +101,25 @@ export function RefineProvider({ children }: { children: React.ReactNode }) {
     },
   };
 
+  const notificationProvider: NotificationProvider = {
+    open: ({ type, message, description }) => {
+      if (type === "success") {
+        toast.success(message, { description });
+      } else if (type === "error") {
+        toast.error(message, { description });
+      } else {
+        toast(message, { description });
+      }
+    },
+    close: () => {},
+  };
+
   return (
     <Refine
       routerProvider={routerProvider}
-      authProvider={authProvider} //Truyền authProvider
+      authProvider={authProvider}
       accessControlProvider={accessControlProvider}
+      notificationProvider={notificationProvider}
       dataProvider={customDataProvider(
         process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000",
         session?.accessToken as string,
@@ -105,11 +128,8 @@ export function RefineProvider({ children }: { children: React.ReactNode }) {
         {
           name: "organizations",
           list: "/dashboard/organizations",
-          create: "/dashboard/organizations/create",
-          edit: "/dashboard/organizations/edit/:id",
-          show: "/dashboard/organizations/:id",
           meta: {
-            label: "Tổ chức", // Tên hiển thị trên sidebar (nếu dùng UI package)
+            label: "Tổ chức",
             canDelete: true,
           },
         },

@@ -3,9 +3,9 @@ import { useNotificationsStore } from "@/lib/store/notifications-store";
 import { cn } from "@/lib/utils";
 
 const STATUS_CONFIG = {
-  connected: { color: "bg-green-500", label: "Đã kết nối" },
-  connecting: { color: "bg-yellow-500 animate-pulse", label: "Đang kết nối" },
-  disconnected: { color: "bg-red-500", label: "Mất kết nối" },
+  connected: { color: "bg-green-500", label: "Connected" },
+  connecting: { color: "bg-yellow-500 animate-pulse", label: "Connecting" },
+  disconnected: { color: "bg-red-500", label: "Disconnected" },
 } as const;
 
 export function ConnectionStatus() {

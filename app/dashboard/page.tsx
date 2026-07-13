@@ -66,12 +66,12 @@ export default function DashboardHome() {
   const [error, setError] = useState("");
   const [hoveredBar, setHoveredBar] = useState<number | null>(null);
 
-  // Tính toán lời chào dựa trên giờ thực tế của hệ thống
+  // Calculate greeting based on current system time
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Chào buổi sáng";
-    if (hour < 18) return "Chào buổi chiều";
-    return "Chào buổi tối";
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
   };
   const greeting = getGreeting();
 
@@ -80,15 +80,17 @@ export default function DashboardHome() {
     setError("");
     try {
       const res = await fetch("/api/dashboard/stats");
-      if (!res.ok) throw new Error("Không thể tải thông tin thống kê.");
+      if (!res.ok) throw new Error("Failed to load statistics.");
       const result = await res.json();
       if (result.success) {
         setStats(result.data);
       } else {
-        throw new Error(result.error || "Lỗi dữ liệu từ backend.");
+        throw new Error(result.error || "Data error from backend.");
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Đã xảy ra lỗi kết nối.");
+      setError(
+        err instanceof Error ? err.message : "A connection error occurred.",
+      );
     } finally {
       setLoading(false);
     }
@@ -116,7 +118,7 @@ export default function DashboardHome() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Khối Header lời chào và trạng thái */}
+      {/* Header greeting and status block */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
@@ -124,8 +126,8 @@ export default function DashboardHome() {
             ! 👋
           </h1>
           <p className="text-sm text-muted-foreground">
-            Dưới đây là tổng quan tình trạng hoạt động và tài liệu huấn luyện AI
-            của hệ thống.
+            Here is an overview of the system&apos;s operational status and AI
+            training documents.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -137,7 +139,7 @@ export default function DashboardHome() {
             className="gap-2"
           >
             <RotateCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-            Làm mới dữ liệu
+            Refresh data
           </Button>
         </div>
       </div>
@@ -162,10 +164,10 @@ export default function DashboardHome() {
         // Hiển thị thông báo lỗi
         <div className="flex flex-col items-center justify-center rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-center text-destructive">
           <AlertTriangle className="mb-2 size-8" />
-          <h3 className="font-semibold">Lỗi tải dữ liệu</h3>
+          <h3 className="font-semibold">Failed to load data</h3>
           <p className="text-sm text-muted-foreground mb-4">{error}</p>
           <Button variant="outline" size="sm" onClick={fetchStats}>
-            Thử lại ngay
+            Retry
           </Button>
         </div>
       ) : (
@@ -177,7 +179,7 @@ export default function DashboardHome() {
             <Card className="relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-md border-primary/10">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Tổng số Website
+                  Total Websites
                 </CardTitle>
                 <div className="rounded-lg bg-blue-500/10 p-2 text-blue-500 dark:bg-blue-500/20">
                   <Globe className="size-4" />
@@ -192,9 +194,9 @@ export default function DashboardHome() {
                     variant="outline"
                     className="border-emerald-500/30 bg-emerald-500/5 text-emerald-500 px-1 py-0.5"
                   >
-                    {stats?.sites?.status?.completed || 0} Hoàn tất
+                    {stats?.sites?.status?.completed || 0} Completed
                   </Badge>
-                  <span>chờ: {stats?.sites?.status?.pending || 0}</span>
+                  <span>pending: {stats?.sites?.status?.pending || 0}</span>
                 </div>
               </CardContent>
             </Card>
@@ -203,7 +205,7 @@ export default function DashboardHome() {
             <Card className="relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-md border-primary/10">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Tài liệu Huấn luyện
+                  Training Documents
                 </CardTitle>
                 <div className="rounded-lg bg-indigo-500/10 p-2 text-indigo-500 dark:bg-indigo-500/20">
                   <FileText className="size-4" />
@@ -218,10 +220,10 @@ export default function DashboardHome() {
                     variant="outline"
                     className="border-indigo-500/30 bg-indigo-500/5 text-indigo-500 px-1 py-0.5"
                   >
-                    {stats?.documents?.status?.ready || 0} Sẵn sàng
+                    {stats?.documents?.status?.ready || 0} Ready
                   </Badge>
                   <span>
-                    đang xử lý: {stats?.documents?.status?.processing || 0}
+                    processing: {stats?.documents?.status?.processing || 0}
                   </span>
                 </div>
               </CardContent>
@@ -231,7 +233,7 @@ export default function DashboardHome() {
             <Card className="relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-md border-primary/10">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Người dùng Hệ thống
+                  System Users
                 </CardTitle>
                 <div className="rounded-lg bg-amber-500/10 p-2 text-amber-500 dark:bg-amber-500/20">
                   <Users className="size-4" />
@@ -255,7 +257,7 @@ export default function DashboardHome() {
             <Card className="relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-md border-primary/10">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Trạng thái Kết nối
+                  Connection Status
                 </CardTitle>
                 <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-500 dark:bg-emerald-500/20">
                   <Server className="size-4" />
@@ -268,7 +270,7 @@ export default function DashboardHome() {
                     <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500"></span>
                   </div>
                   <span className="text-base font-semibold text-emerald-600 dark:text-emerald-400">
-                    Hoạt động tốt
+                    All systems operational
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
@@ -303,10 +305,10 @@ export default function DashboardHome() {
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="text-base font-semibold">
-                    Tần suất Tin nhắn hàng tuần
+                    Weekly Message Frequency
                   </CardTitle>
                   <CardDescription>
-                    Số lượng hội thoại được chatbot tự động xử lý
+                    Number of conversations handled automatically by the chatbot
                   </CardDescription>
                 </div>
                 <TrendingUp className="text-muted-foreground size-4" />
@@ -387,13 +389,13 @@ export default function DashboardHome() {
                 </div>
                 <div className="flex w-full items-center justify-between text-xs text-muted-foreground border-t pt-4 mt-2">
                   <span>
-                    Trung bình phản hồi:{" "}
+                    Avg. response time:{" "}
                     <strong className="text-foreground">
                       {stats?.chat?.avgResponseTime}
                     </strong>
                   </span>
                   <span>
-                    Tổng hội thoại:{" "}
+                    Total conversations:{" "}
                     <strong className="text-foreground">
                       {stats?.chat?.totalConversations}
                     </strong>
@@ -406,10 +408,10 @@ export default function DashboardHome() {
             <Card className="border-primary/5">
               <CardHeader>
                 <CardTitle className="text-base font-semibold">
-                  Định dạng Tài liệu
+                  Document Formats
                 </CardTitle>
                 <CardDescription>
-                  Phân loại tệp huấn luyện AI trong hệ thống
+                  AI training file breakdown by type
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
@@ -426,7 +428,7 @@ export default function DashboardHome() {
                           {type.name}
                         </span>
                         <span className="font-semibold text-foreground">
-                          {type.count} tệp ({percentage}%)
+                          {type.count} files ({percentage}%)
                         </span>
                       </div>
                       {/* Thanh Progress custom */}
@@ -444,10 +446,10 @@ export default function DashboardHome() {
 
                 <div className="mt-4 rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
                   <p className="leading-relaxed">
-                    💡 <strong>Mẹo huấn luyện:</strong> Hệ thống ưu tiên định
-                    dạng <strong>PDF</strong> cho các tập tài liệu lớn chứa
-                    nhiều văn bản định dạng bảng biểu và <strong>TXT</strong>{" "}
-                    cho các câu trả lời ngắn Q&A.
+                    💡 <strong>Training tip:</strong> The system prioritizes
+                    <strong>PDF</strong> format for large document sets with
+                    table-heavy content, and <strong>TXT</strong> for short Q&A
+                    answers.
                   </p>
                 </div>
               </CardContent>
@@ -460,10 +462,10 @@ export default function DashboardHome() {
             <Card className="border-primary/5">
               <CardHeader>
                 <CardTitle className="text-base font-semibold">
-                  Hoạt động gần đây
+                  Recent Activity
                 </CardTitle>
                 <CardDescription>
-                  Báo cáo tình hình vận hành của hệ thống
+                  System operational status report
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
@@ -475,15 +477,15 @@ export default function DashboardHome() {
                     </div>
                     <div className="flex-1 space-y-0.5">
                       <p className="text-sm font-medium">
-                        Đã huấn luyện xong dữ liệu
+                        Training data completed
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Tài liệu &quot;huong_dan_su_dung.pdf&quot; thuộc Website
-                        &quot;VTI Academy&quot; đã sẵn sàng.
+                        Document &quot;huong_dan_su_dung.pdf&quot; for website
+                        &quot;VTI Academy&quot; is now ready.
                       </p>
                     </div>
                     <span className="text-[10px] text-muted-foreground font-medium mt-1">
-                      2 phút trước
+                      2 minutes ago
                     </span>
                   </div>
 
@@ -494,15 +496,15 @@ export default function DashboardHome() {
                     </div>
                     <div className="flex-1 space-y-0.5">
                       <p className="text-sm font-medium">
-                        Tích hợp thành công Website mới
+                        New website successfully integrated
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Admin đã khởi tạo và thiết lập thành công chatbot cho
-                        &quot;vti-group.vn&quot;.
+                        Admin has successfully initialized and configured the
+                        chatbot for &quot;vti-group.vn&quot;.
                       </p>
                     </div>
                     <span className="text-[10px] text-muted-foreground font-medium mt-1">
-                      1 giờ trước
+                      1 hour ago
                     </span>
                   </div>
 
@@ -513,15 +515,15 @@ export default function DashboardHome() {
                     </div>
                     <div className="flex-1 space-y-0.5">
                       <p className="text-sm font-medium">
-                        Tài liệu mới đang được xử lý
+                        New document is being processed
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Agent tải lên tệp &quot;quy_che_tuyen_dung.txt&quot; cho
-                        chatbot site ID #3.
+                        Agent uploaded file &quot;quy_che_tuyen_dung.txt&quot;
+                        for chatbot site ID #3.
                       </p>
                     </div>
                     <span className="text-[10px] text-muted-foreground font-medium mt-1">
-                      3 giờ trước
+                      3 hours ago
                     </span>
                   </div>
                 </div>
@@ -532,10 +534,10 @@ export default function DashboardHome() {
             <Card className="border-primary/5 flex flex-col justify-between">
               <CardHeader>
                 <CardTitle className="text-base font-semibold">
-                  Thao tác Nhanh
+                  Quick Actions
                 </CardTitle>
                 <CardDescription>
-                  Lối tắt truy cập các khu vực quản trị cốt lõi
+                  Shortcuts to key administration areas
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 pt-2">
@@ -546,11 +548,9 @@ export default function DashboardHome() {
                         <Users className="size-4" />
                       </div>
                       <div className="text-left">
-                        <p className="text-sm font-semibold">
-                          Quản lý người dùng
-                        </p>
+                        <p className="text-sm font-semibold">User Management</p>
                         <p className="text-xs text-muted-foreground">
-                          Thêm, sửa đổi hoặc xóa phân quyền Agent/Admin.
+                          Add, edit, or remove Agent/Admin permissions.
                         </p>
                       </div>
                     </div>
@@ -565,10 +565,11 @@ export default function DashboardHome() {
                         <UserCheck className="size-4" />
                       </div>
                       <div className="text-left">
-                        <p className="text-sm font-semibold">Hồ sơ cá nhân</p>
+                        <p className="text-sm font-semibold">
+                          Personal Profile
+                        </p>
                         <p className="text-xs text-muted-foreground">
-                          Thay đổi mật khẩu, ảnh đại diện và thông tin tài
-                          khoản.
+                          Change password, avatar, and account information.
                         </p>
                       </div>
                     </div>
@@ -579,15 +580,15 @@ export default function DashboardHome() {
                 <div className="rounded-xl bg-gradient-to-br from-indigo-500/5 to-purple-500/5 border border-primary/5 p-4 flex items-center justify-between mt-2">
                   <div className="space-y-1">
                     <p className="text-sm font-bold">
-                      Cần tích hợp chatbot mới?
+                      Need to integrate a new chatbot?
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Tạo site và liên kết bộ tài liệu học tập ngay.
+                      Create a site and link a training document set now.
                     </p>
                   </div>
                   <Button size="sm" className="gap-1.5 shadow-sm">
                     <Plus className="size-3.5" />
-                    Thêm Website
+                    Add Website
                   </Button>
                 </div>
               </CardContent>

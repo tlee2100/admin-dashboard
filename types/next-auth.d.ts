@@ -10,6 +10,7 @@ declare module "next-auth" {
       role: string;
       bio?: string | null;
       avatarUrl?: string | null;
+      organizationId?: number | null;
     };
   }
 
@@ -20,6 +21,7 @@ declare module "next-auth" {
     role: string;
     bio?: string | null;
     avatarUrl?: string | null;
+    organizationId?: number | null;
   }
 }
 
@@ -31,6 +33,7 @@ declare module "next-auth/jwt" {
     role?: string;
     bio?: string | null;
     avatarUrl?: string | null;
+    organizationId?: number | null;
     error?: "RefreshAccessTokenError";
   }
 }

@@ -100,7 +100,7 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
       );
 
       if (!res.ok) {
-        throw new Error("Không thể thêm nhân viên");
+        throw new Error("Unable to add agent");
       }
 
       setSelectedAgentId("");
@@ -111,7 +111,7 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
       });
     } catch (error) {
       console.error(error);
-      alert("Đã xảy ra lỗi khi gán nhân viên.");
+      alert("An error occurred while assigning the agent.");
     } finally {
       setIsMutating(false);
     }
@@ -119,7 +119,8 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
 
   const handleRemoveAgent = async (agentId: string | number) => {
     if (!siteId) return;
-    if (!confirm("Bạn có chắc chắn muốn gỡ nhân viên này khỏi site?")) return;
+    if (!confirm("Are you sure you want to remove this agent from the site?"))
+      return;
 
     setIsMutating(true);
     try {
@@ -134,7 +135,7 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
       );
 
       if (!res.ok) {
-        throw new Error("Không thể gỡ nhân viên");
+        throw new Error("Unable to remove agent");
       }
 
       invalidate({
@@ -144,7 +145,7 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
       });
     } catch (error) {
       console.error(error);
-      alert("Đã xảy ra lỗi khi gỡ nhân viên.");
+      alert("An error occurred while removing the agent.");
     } finally {
       setIsMutating(false);
     }
@@ -156,10 +157,10 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
         <SheetHeader className="mb-6">
           <SheetTitle className="flex items-center gap-2">
             <UsersIcon className="size-5" />
-            Quản lý Nhân viên
+            Agent Management
           </SheetTitle>
           <SheetDescription>
-            Phân công nhân viên phụ trách tư vấn cho trang web:{" "}
+            Assign agents responsible for consulting on website:{" "}
             <span className="font-semibold text-foreground">{siteName}</span>
           </SheetDescription>
         </SheetHeader>
@@ -167,9 +168,7 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
         {/* Add Agent Zone */}
         <CanAccess action="edit" resource="sites" fallback={null}>
           <div className="mb-8 p-4 border rounded-lg bg-muted/20">
-            <h3 className="text-sm font-medium mb-3">
-              Thêm nhân viên vào Site
-            </h3>
+            <h3 className="text-sm font-medium mb-3">Add Agent to Site</h3>
             <div className="flex gap-2">
               <select
                 value={selectedAgentId}
@@ -181,10 +180,10 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
               >
                 <option value="">
                   {isAgentsLoading
-                    ? "Đang tải..."
+                    ? "Loading..."
                     : availableAgents.length === 0
-                      ? "Không còn nhân viên nào"
-                      : "--- Chọn nhân viên ---"}
+                      ? "No agents available"
+                      : "--- Select agent ---"}
                 </option>
                 {availableAgents.map((agent) => (
                   <option key={agent.id} value={agent.id}>
@@ -202,7 +201,7 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
                 ) : (
                   <Plus className="size-4" />
                 )}{" "}
-                Thêm
+                Add
               </Button>
             </div>
           </div>
@@ -211,9 +210,9 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
         {/* Assigned Agents List */}
         <div>
           <h3 className="text-sm font-medium mb-3 flex items-center justify-between">
-            <span>Danh sách nhân viên phụ trách</span>
+            <span>Assigned Agents</span>
             <span className="text-muted-foreground font-normal text-xs">
-              {assignedAgents.length} người
+              {assignedAgents.length} people
             </span>
           </h3>
 
@@ -221,8 +220,8 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
-                  <TableHead>Tên nhân viên</TableHead>
-                  <TableHead className="w-[70px] text-right">Gỡ</TableHead>
+                  <TableHead>Agent Name</TableHead>
+                  <TableHead className="w-[70px] text-right">Remove</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -241,7 +240,7 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
                       colSpan={2}
                       className="text-center py-6 text-muted-foreground text-sm"
                     >
-                      Chưa có nhân viên nào được phân công.
+                      No agents assigned yet.
                     </TableCell>
                   </TableRow>
                 ) : (

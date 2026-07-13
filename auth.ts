@@ -40,6 +40,7 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   providers: [
     Credentials({
       credentials: {
@@ -115,12 +116,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.role = user.role;
 
         try {
-          const res = await fetch(`${process.env.API_URL}/users/${user.id}`);
+          const res = await fetch(`${process.env.API_URL}/users/${user.id}`, {
+            headers: {
+              Authorization: `Bearer ${user.accessToken}`,
+            },
+          });
           if (res.ok) {
             const profile = await res.json();
             token.name = profile.name;
             token.bio = profile.bio;
             token.avatarUrl = profile.avatarUrl;
+            token.organizationId = profile.organizationId;
           }
         } catch {}
 
@@ -153,6 +159,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.user.name = (token.name as string) ?? session.user.email;
       session.user.bio = token.bio as string | null;
       session.user.avatarUrl = token.avatarUrl as string | null;
+      session.user.organizationId = token.organizationId as number | null;
       session.error = token.error;
       return session;
     },

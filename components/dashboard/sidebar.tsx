@@ -20,7 +20,7 @@ const navItems = [
   { href: "/dashboard/users", label: "Users", icon: Users, resource: "users" },
   {
     href: "/dashboard/organizations",
-    label: "Tổ chức",
+    label: "Organizations",
     icon: Building2,
     resource: "organizations",
   },

@@ -51,6 +51,7 @@ export const customDataProvider = (
         const mode = pagination.mode;
 
         if (mode !== "off" && page && limit) {
+          // nestjs-paginate uses `page` and `limit`
           url.searchParams.append("page", String(page));
           url.searchParams.append("limit", String(limit));
         }
@@ -64,18 +65,44 @@ export const customDataProvider = (
             filter.value !== undefined &&
             filter.value !== ""
           ) {
-            url.searchParams.append(filter.field, String(filter.value));
+            if (resource === "sites" || resource === "documents") {
+              if (filter.operator === "contains") {
+                url.searchParams.append(
+                  `filter.${filter.field}`,
+                  `$ilike:%${String(filter.value)}%`,
+                );
+              } else {
+                url.searchParams.append(
+                  `filter.${filter.field}`,
+                  `$eq:${String(filter.value)}`,
+                );
+              }
+            } else {
+              url.searchParams.append(filter.field, String(filter.value));
+            }
           }
         });
       }
 
-      // Map sorters (Chuyển dạng sorter của Refine thành ?sortBy=field&sortOrder=ASC/DESC)
+      // Map sorters
       if (sorters && sorters.length > 0) {
-        const sort = sorters[0];
-        url.searchParams.append("sortBy", sort.field);
-        url.searchParams.append("sortOrder", sort.order.toUpperCase());
+        if (resource === "sites" || resource === "documents") {
+          // nestjs-paginate expects: sortBy[0][col]=name&sortBy[0][dir]=ASC
+          sorters.forEach((sort, i) => {
+            url.searchParams.append(`sortBy[${i}][col]`, sort.field);
+            url.searchParams.append(
+              `sortBy[${i}][dir]`,
+              sort.order.toUpperCase(),
+            );
+          });
+        } else {
+          const sort = sorters[0];
+          url.searchParams.append("sortBy", sort.field);
+          url.searchParams.append("sortOrder", sort.order.toUpperCase());
+        }
       }
 
+      console.log(`[DataProvider] GET ${url.toString()}`);
       const res = await fetch(url.toString(), { headers });
       await handleError(res);
       const data = await res.json();
@@ -84,7 +111,7 @@ export const customDataProvider = (
       // Nếu BE của bạn chỉ trả về mảng [...] thì đổi thành return { data, total: data.length }
       return {
         data: data.data || data,
-        total: data.total || data.length,
+        total: data.total ?? data.meta?.totalItems ?? data.length ?? 0,
       };
     },
 

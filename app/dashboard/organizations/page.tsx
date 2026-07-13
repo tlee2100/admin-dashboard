@@ -1,31 +1,116 @@
 "use client";
 
 import { useTable, useDelete } from "@refinedev/core";
-import { useState } from "react";
-import Link from "next/link";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { useForm } from "@refinedev/react-hook-form";
+import { useState, useEffect } from "react";
+import {
+  Pencil,
+  Trash2,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Building2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
 
 export default function OrganizationListPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+
   const { tableQuery, currentPage, setCurrentPage, pageCount } = useTable({
     resource: "organizations",
     pagination: { pageSize: 10 },
   });
 
-  const { mutate: deleteOrg, mutation } = useDelete();
-  const isDeleting = mutation?.isPending;
+  const { mutate: deleteOrg, mutation: deleteMutation } = useDelete();
+  const isDeleting = deleteMutation?.isPending;
 
-  type OrgRecord = { id: string; name: string };
+  type OrgRecord = { id: string; name: string; slug: string };
   const organizations =
     (tableQuery?.data?.data as unknown as OrgRecord[]) || [];
+
+  // Form setup for Create / Edit
+  const {
+    refineCore: { onFinish, formLoading, query },
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors },
+  } = useForm({
+    refineCoreProps: {
+      resource: "organizations",
+      action: editId ? "edit" : "create",
+      id: editId ?? undefined,
+      onMutationSuccess: () => {
+        handleCloseModal();
+      },
+    },
+  });
+
+  // Auto-fill when editing
+  useEffect(() => {
+    if (editId && query?.data?.data) {
+      const org = query.data.data as { name: string; slug: string };
+      reset({ name: org.name, slug: org.slug });
+    }
+  }, [editId, query?.data?.data, reset]);
+
+  // Auto-generate slug from name (only when creating)
+  const nameValue = watch("name");
+  useEffect(() => {
+    if (!editId && nameValue) {
+      const slug = nameValue
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-");
+      setValue("slug", slug);
+    }
+  }, [nameValue, editId, setValue]);
+
+  const handleOpenCreate = () => {
+    setEditId(null);
+    reset({ name: "", slug: "" });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (id: string) => {
+    setEditId(id);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setTimeout(() => {
+      setEditId(null);
+      reset({ name: "", slug: "" });
+    }, 200);
+  };
 
   const handleDelete = (id: string) => {
     deleteOrg(
       { resource: "organizations", id },
-      {
-        onSuccess: () => setDeleteId(null),
-      },
+      { onSuccess: () => setDeleteId(null) },
     );
   };
 
@@ -33,71 +118,88 @@ export default function OrganizationListPage() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Quản lý Tổ chức</h1>
-        <Link href="/dashboard/organizations/create">
-          <Button className="gap-2">
-            <Plus className="size-4" />
-            Thêm mới
-          </Button>
-        </Link>
+        <div>
+          <h1 className="text-2xl font-bold">Organization Management</h1>
+          <p className="text-sm text-muted-foreground">
+            Total: {tableQuery?.data?.total || 0} organizations
+          </p>
+        </div>
+        <Button className="gap-2" onClick={handleOpenCreate}>
+          <Plus className="size-4" />
+          Add New
+        </Button>
       </div>
 
       {/* Table */}
       <div className="rounded-lg border overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              <th className="text-left px-4 py-3 font-medium">ID</th>
-              <th className="text-left px-4 py-3 font-medium">Tên tổ chức</th>
-              <th className="text-left px-4 py-3 font-medium">Hành động</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
+              <TableHead>Organization Name</TableHead>
+              <TableHead>Slug</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {tableQuery?.isLoading ? (
-              <tr>
-                <td
+              <TableRow>
+                <TableCell
                   colSpan={3}
                   className="text-center py-8 text-muted-foreground"
                 >
-                  Đang tải...
-                </td>
-              </tr>
+                  Loading data...
+                </TableCell>
+              </TableRow>
+            ) : organizations.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={3}
+                  className="text-center py-8 text-muted-foreground"
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <Building2 className="size-8 opacity-30" />
+                    <span>No organizations found</span>
+                  </div>
+                </TableCell>
+              </TableRow>
             ) : (
               organizations.map((org) => (
-                <tr
-                  key={org.id}
-                  className="border-t hover:bg-muted/30 transition-colors"
-                >
-                  <td className="px-4 py-3">{org.id}</td>
-                  <td className="px-4 py-3 font-medium">{org.name}</td>
-                  <td className="px-4 py-3">
+                <TableRow key={org.id} className="hover:bg-muted/30">
+                  <TableCell className="font-medium">{org.name}</TableCell>
+                  <TableCell className="text-muted-foreground font-mono text-xs">
+                    {org.slug}
+                  </TableCell>
+                  <TableCell>
                     <div className="flex items-center gap-2">
-                      <Link href={`/dashboard/organizations/edit/${org.id}`}>
-                        <Button variant="outline" size="sm" className="gap-1.5">
-                          <Pencil className="size-3.5" /> Sửa
-                        </Button>
-                      </Link>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => handleOpenEdit(org.id)}
+                      >
+                        <Pencil className="size-3.5" /> Edit
+                      </Button>
                       <Button
                         variant="destructive"
                         size="sm"
                         className="gap-1.5"
                         onClick={() => setDeleteId(org.id)}
                       >
-                        <Trash2 className="size-3.5" /> Xóa
+                        <Trash2 className="size-3.5" /> Delete
                       </Button>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
-      {/* Phân trang */}
+      {/* Pagination */}
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>
-          Trang {currentPage} / {pageCount}
+          Page {currentPage} / {pageCount}
         </span>
         <div className="flex gap-2">
           <Button
@@ -105,39 +207,128 @@ export default function OrganizationListPage() {
             size="sm"
             disabled={(currentPage ?? 1) <= 1}
             onClick={() => setCurrentPage((currentPage ?? 1) - 1)}
+            className="gap-1"
           >
-            Trước
+            <ChevronLeft className="size-4" /> Previous
           </Button>
           <Button
             variant="outline"
             size="sm"
             disabled={(currentPage ?? 1) >= (pageCount ?? 1)}
             onClick={() => setCurrentPage((currentPage ?? 1) + 1)}
+            className="gap-1"
           >
-            Tiếp
+            Next <ChevronRight className="size-4" />
           </Button>
         </div>
       </div>
 
-      {/* Modal xác nhận xóa */}
+      {/* Create / Edit Modal */}
+      <Dialog
+        open={isModalOpen}
+        onOpenChange={(open) => {
+          if (!open) handleCloseModal();
+        }}
+      >
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editId ? "Edit Organization" : "Add New Organization"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <form
+            onSubmit={handleSubmit(onFinish)}
+            className="flex flex-col gap-4 mt-2"
+          >
+            {/* Name */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">
+                Organization Name <span className="text-destructive">*</span>
+              </label>
+              <Input
+                {...register("name", {
+                  required: "Organization name cannot be empty",
+                  minLength: {
+                    value: 2,
+                    message: "Name must be at least 2 characters",
+                  },
+                })}
+                placeholder="e.g. VTI Group"
+              />
+              {errors.name && (
+                <span className="text-xs text-destructive">
+                  {errors.name.message as string}
+                </span>
+              )}
+            </div>
+
+            {/* Slug */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">
+                Slug <span className="text-destructive">*</span>
+              </label>
+              <Input
+                {...register("slug", {
+                  required: "Slug cannot be empty",
+                  pattern: {
+                    value: /^[a-z0-9-]+$/,
+                    message:
+                      "Slug can only contain lowercase letters, numbers and hyphens (-)",
+                  },
+                })}
+                placeholder="e.g. vti-group"
+              />
+              <p className="text-xs text-muted-foreground">
+                Auto-generated from name. Only lowercase letters, numbers, and
+                hyphens.
+              </p>
+              {errors.slug && (
+                <span className="text-xs text-destructive">
+                  {errors.slug.message as string}
+                </span>
+              )}
+            </div>
+
+            <DialogFooter className="mt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCloseModal}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={formLoading}>
+                {formLoading
+                  ? "Saving..."
+                  : editId
+                    ? "Save changes"
+                    : "Create Organization"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
       {deleteId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
           <div className="bg-background rounded-xl p-6 shadow-xl w-[340px] flex flex-col gap-4">
-            <h3 className="font-semibold text-lg">Xác nhận xóa</h3>
+            <h3 className="font-semibold text-lg">Confirm Deletion</h3>
             <p className="text-sm text-muted-foreground">
-              Bạn có chắc muốn xóa tổ chức này không? Hành động này không thể
-              hoàn tác.
+              Are you sure you want to delete this organization? This action
+              cannot be undone.
             </p>
             <div className="flex gap-3 justify-end">
               <Button variant="outline" onClick={() => setDeleteId(null)}>
-                Hủy
+                Cancel
               </Button>
               <Button
                 variant="destructive"
                 disabled={isDeleting}
                 onClick={() => handleDelete(deleteId)}
               >
-                {isDeleting ? "Đang xóa..." : "Xóa"}
+                {isDeleting ? "Deleting..." : "Delete"}
               </Button>
             </div>
           </div>
