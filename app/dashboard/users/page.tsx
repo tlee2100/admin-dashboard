@@ -90,9 +90,7 @@ export default function UsersListPage() {
     if (payload.organizationId === "") {
       delete payload.organizationId;
     }
-    if (!editId) {
-      delete payload.role;
-    }
+    delete payload.role;
     onFinish(payload);
   };
 
@@ -108,7 +106,6 @@ export default function UsersListPage() {
       reset({
         name: user.name,
         email: user.email,
-        role: user.role,
         organizationId: user.organizationId || "",
         password: "", // không hiện password cũ
       });
@@ -143,7 +140,6 @@ export default function UsersListPage() {
       name: "",
       email: "",
       password: "",
-      role: "agent",
       organizationId: "",
     });
     setIsModalOpen(true);
@@ -295,14 +291,16 @@ export default function UsersListPage() {
                       >
                         <Pencil className="size-3.5" /> Edit
                       </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => setDeleteId(user.id)}
-                      >
-                        <Trash2 className="size-3.5" /> Delete
-                      </Button>
+                      {String(user.id) !== String(session?.user?.id) && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => setDeleteId(user.id)}
+                        >
+                          <Trash2 className="size-3.5" /> Delete
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -440,20 +438,6 @@ export default function UsersListPage() {
                 </span>
               )}
             </div>
-
-            {editId && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Role</label>
-                <select
-                  {...register("role")}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="super_admin">Super Admin</option>
-                  <option value="admin">Admin</option>
-                  <option value="agent">Agent</option>
-                </select>
-              </div>
-            )}
 
             {isSuperAdmin && (
               <div className="space-y-2">

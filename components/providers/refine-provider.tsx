@@ -93,6 +93,9 @@ export function RefineProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (resource === "documents") {
+          if (action === "create" || action === "edit" || action === "delete") {
+            return { can: false, reason: "Unauthorized" };
+          }
           return { can: true };
         }
       }
@@ -154,6 +157,7 @@ export function RefineProvider({ children }: { children: React.ReactNode }) {
         },
         {
           name: "documents",
+          list: "/dashboard/documents",
           meta: {
             label: "Tài liệu",
             canDelete: true,

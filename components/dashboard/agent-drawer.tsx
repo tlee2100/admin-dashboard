@@ -153,7 +153,7 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
 
   return (
     <Sheet open={!!siteId} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-md overflow-y-auto">
+      <SheetContent className="sm:max-w-md overflow-y-auto p-6 sm:p-8">
         <SheetHeader className="mb-6">
           <SheetTitle className="flex items-center gap-2">
             <UsersIcon className="size-5" />

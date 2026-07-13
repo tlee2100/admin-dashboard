@@ -185,7 +185,7 @@ export function DocumentDrawer({
 
   return (
     <Sheet open={!!siteId} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-xl overflow-y-auto">
+      <SheetContent className="sm:max-w-xl overflow-y-auto p-6 sm:p-8">
         <SheetHeader className="mb-6">
           <SheetTitle>Document Management</SheetTitle>
           <SheetDescription>

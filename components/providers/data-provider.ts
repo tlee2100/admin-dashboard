@@ -157,5 +157,30 @@ export const customDataProvider = (
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return { data: { id } as any };
     },
+
+    // 6. Custom cho Upload file
+    custom: async ({ url, method, payload, headers: customHeaders }) => {
+      const fetchHeaders = new Headers({
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      });
+
+      // Thêm các custom headers nếu có (nhưng cẩn thận ghi đè Content-Type của FormData)
+      if (customHeaders) {
+        Object.entries(customHeaders).forEach(([key, value]) => {
+          fetchHeaders.set(key, value as string);
+        });
+      }
+
+      // Payload FormData sẽ được trình duyệt tự set Content-Type với boundary
+      const res = await fetch(`${apiUrl}${url}`, {
+        method: method,
+        headers: fetchHeaders,
+        body: payload as BodyInit,
+      });
+
+      await handleError(res);
+      const data = await res.json();
+      return { data };
+    },
   };
 };

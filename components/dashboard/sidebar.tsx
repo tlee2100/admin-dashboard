@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Building2,
   Globe,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils"; // hàm merge class của Shadcn
 
@@ -25,6 +26,12 @@ const navItems = [
     resource: "organizations",
   },
   { href: "/dashboard/sites", label: "Sites", icon: Globe, resource: "sites" },
+  {
+    href: "/dashboard/documents",
+    label: "Documents",
+    icon: FileText,
+    resource: "documents",
+  },
   { href: "/dashboard/profile", label: "Profile", icon: UserCircle },
 ];
 
