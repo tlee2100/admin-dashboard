@@ -4,6 +4,7 @@ import { useTable, useDelete, useSelect } from "@refinedev/core";
 import { useForm } from "@refinedev/react-hook-form";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { toast } from "sonner";
 import { Pencil, Trash2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +26,18 @@ import {
 } from "@/components/ui/dialog";
 
 export default function UsersListPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+
+  useEffect(() => {
+    if (
+      status === "authenticated" &&
+      session?.user?.role?.toUpperCase() === "AGENT"
+    ) {
+      toast.error("You do not have permission to access User Management.");
+      window.location.href = "/dashboard";
+    }
+  }, [session, status]);
+
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // States cho Form Modal
@@ -179,8 +191,20 @@ export default function UsersListPage() {
     setSearchRole("");
   };
 
+  if (
+    status === "loading" ||
+    (status === "authenticated" &&
+      session?.user?.role?.toUpperCase() === "AGENT")
+  ) {
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        Checking permissions...
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

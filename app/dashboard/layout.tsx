@@ -4,6 +4,7 @@ import { Header } from "@/components/dashboard/header";
 import { NotificationSocketProvider } from "@/components/notification-socket-provider";
 import { Providers } from "@/app/provider";
 import { RefineProvider } from "@/components/providers/refine-provider";
+import { DashboardWrapper } from "@/components/dashboard/dashboard-wrapper";
 
 // Server Component (không "use client") → gọi auth() trực tiếp, không cần useSession()
 export default async function DashboardLayout({
@@ -16,15 +17,17 @@ export default async function DashboardLayout({
   return (
     <Providers session={session}>
       <RefineProvider>
-        <div className="flex h-screen overflow-hidden bg-background">
-          <Sidebar />
-          <div className="flex flex-1 flex-col min-w-0">
-            <NotificationSocketProvider>
-              <Header user={session?.user} />
-            </NotificationSocketProvider>
-            <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <DashboardWrapper>
+          <div className="flex h-screen overflow-hidden bg-background">
+            <Sidebar />
+            <div className="flex flex-1 flex-col min-w-0">
+              <NotificationSocketProvider>
+                <Header user={session?.user} />
+              </NotificationSocketProvider>
+              <main className="flex-1 overflow-y-auto p-6">{children}</main>
+            </div>
           </div>
-        </div>
+        </DashboardWrapper>
       </RefineProvider>
     </Providers>
   );

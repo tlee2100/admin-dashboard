@@ -3,6 +3,8 @@
 import { useTable, useDelete } from "@refinedev/core";
 import { useForm } from "@refinedev/react-hook-form";
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { toast } from "sonner";
 import {
   Pencil,
   Trash2,
@@ -30,6 +32,18 @@ import {
 } from "@/components/ui/table";
 
 export default function OrganizationListPage() {
+  const { data: session, status } = useSession();
+
+  useEffect(() => {
+    if (
+      status === "authenticated" &&
+      session?.user?.role?.toUpperCase() !== "SUPER_ADMIN"
+    ) {
+      toast.error("You do not have permission to access Organizations.");
+      window.location.href = "/dashboard";
+    }
+  }, [session, status]);
+
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -113,6 +127,18 @@ export default function OrganizationListPage() {
       { onSuccess: () => setDeleteId(null) },
     );
   };
+
+  if (
+    status === "loading" ||
+    (status === "authenticated" &&
+      session?.user?.role?.toUpperCase() !== "SUPER_ADMIN")
+  ) {
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        Checking permissions...
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">

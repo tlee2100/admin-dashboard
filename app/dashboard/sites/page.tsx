@@ -13,7 +13,11 @@ import {
   Globe,
   FileText,
   Users,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DocumentDrawer } from "@/components/dashboard/document-drawer";
 import { AgentDrawer } from "@/components/dashboard/agent-drawer";
@@ -72,6 +76,7 @@ export default function SitesListPage() {
     name: string;
     url: string;
     organization?: { id: number; name: string };
+    knowledgeBaseStatus?: string;
   };
   const sites = (tableQuery?.data?.data as unknown as SiteRecord[]) || [];
 
@@ -169,6 +174,42 @@ export default function SitesListPage() {
     );
   };
 
+  const getKbStatusBadge = (status?: string) => {
+    const s = status?.toUpperCase() || "PENDING";
+    switch (s) {
+      case "PENDING":
+        return (
+          <Badge variant="outline" className="text-yellow-600 bg-yellow-50">
+            Pending
+          </Badge>
+        );
+      case "PROCESSING":
+        return (
+          <Badge variant="outline" className="text-blue-600 bg-blue-50">
+            <Loader2 className="mr-1 size-3 animate-spin" /> Processing
+          </Badge>
+        );
+      case "READY":
+        return (
+          <Badge variant="outline" className="text-green-600 bg-green-50">
+            <CheckCircle className="mr-1 size-3" /> Ready
+          </Badge>
+        );
+      case "FAILED":
+        return (
+          <Badge variant="outline" className="text-red-600 bg-red-50">
+            <AlertCircle className="mr-1 size-3" /> Failed
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="outline" className="text-gray-600 bg-gray-50">
+            {status || "None"}
+          </Badge>
+        );
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -246,6 +287,7 @@ export default function SitesListPage() {
               <TableHead>Website Name</TableHead>
               <TableHead>URL</TableHead>
               <TableHead>Organization</TableHead>
+              <TableHead>KB Status</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -253,7 +295,7 @@ export default function SitesListPage() {
             {tableQuery?.isLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={4}
+                  colSpan={5}
                   className="text-center py-8 text-muted-foreground"
                 >
                   Loading data...
@@ -262,7 +304,7 @@ export default function SitesListPage() {
             ) : sites.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={4}
+                  colSpan={5}
                   className="text-center py-8 text-muted-foreground"
                 >
                   No websites found
@@ -296,6 +338,9 @@ export default function SitesListPage() {
                         None
                       </span>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    {getKbStatusBadge(site.knowledgeBaseStatus)}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
