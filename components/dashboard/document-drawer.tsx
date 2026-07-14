@@ -1,6 +1,6 @@
 "use client";
 
-import { useTable, useDelete } from "@refinedev/core";
+import { useTable, useDelete, CanAccess } from "@refinedev/core";
 import { useState, useCallback, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useDropzone } from "react-dropzone";
@@ -195,94 +195,96 @@ export function DocumentDrawer({
         </SheetHeader>
 
         {/* Upload Zone */}
-        <div className="mb-8">
-          <h3 className="text-sm font-medium mb-3">Upload new documents</h3>
-          <div
-            {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-              isDragActive
-                ? "border-primary bg-primary/5"
-                : "border-muted-foreground/25 hover:border-primary/50"
-            }`}
-          >
-            <input {...getInputProps()} />
-            {isUploading ? (
-              <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                <Loader2 className="size-8 animate-spin text-primary" />
-                <p>Uploading documents...</p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                <UploadCloud className="size-8 mb-2 text-muted-foreground/50" />
-                <p className="font-medium text-foreground">
-                  Drag &amp; drop files here, or click to select files
-                </p>
-                <p className="text-sm">Supports: PDF, TXT (Max 10MB)</p>
+        <CanAccess action="create" resource="documents" fallback={null}>
+          <div className="mb-8">
+            <h3 className="text-sm font-medium mb-3">Upload new documents</h3>
+            <div
+              {...getRootProps()}
+              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                isDragActive
+                  ? "border-primary bg-primary/5"
+                  : "border-muted-foreground/25 hover:border-primary/50"
+              }`}
+            >
+              <input {...getInputProps()} />
+              {isUploading ? (
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <Loader2 className="size-8 animate-spin text-primary" />
+                  <p>Uploading documents...</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <UploadCloud className="size-8 mb-2 text-muted-foreground/50" />
+                  <p className="font-medium text-foreground">
+                    Drag &amp; drop files here, or click to select files
+                  </p>
+                  <p className="text-sm">Supports: PDF, TXT (Max 10MB)</p>
+                </div>
+              )}
+            </div>
+            {fileRejections.length > 0 && (
+              <p className="text-sm text-destructive mt-2 flex items-center gap-1">
+                <AlertCircle className="size-4" />
+                Invalid file or exceeds 10MB!
+              </p>
+            )}
+            {uploadError && (
+              <p className="text-sm text-destructive mt-2 flex items-center gap-1">
+                <AlertCircle className="size-4" />
+                Error: {uploadError}
+              </p>
+            )}
+
+            {/* Danh sách file đang chờ (Staging) */}
+            {stagedFiles.length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-sm font-medium mb-2">
+                  Files pending upload ({stagedFiles.length})
+                </h4>
+                <ul className="space-y-2 mb-4">
+                  {stagedFiles.map((file, index) => (
+                    <li
+                      key={index}
+                      className="flex items-center justify-between bg-muted/50 p-2 rounded-md border text-sm"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <FileText className="size-4 text-muted-foreground shrink-0" />
+                        <span className="truncate">{file.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-destructive hover:bg-destructive/10 shrink-0"
+                        onClick={() => removeStagedFile(index)}
+                        disabled={isUploading}
+                      >
+                        <X className="size-3" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  onClick={handleUpload}
+                  disabled={isUploading || stagedFiles.length === 0}
+                  className="w-full gap-2"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" /> Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud className="size-4" /> Confirm Upload
+                    </>
+                  )}
+                </Button>
               </div>
             )}
           </div>
-          {fileRejections.length > 0 && (
-            <p className="text-sm text-destructive mt-2 flex items-center gap-1">
-              <AlertCircle className="size-4" />
-              Invalid file or exceeds 10MB!
-            </p>
-          )}
-          {uploadError && (
-            <p className="text-sm text-destructive mt-2 flex items-center gap-1">
-              <AlertCircle className="size-4" />
-              Error: {uploadError}
-            </p>
-          )}
-
-          {/* Danh sách file đang chờ (Staging) */}
-          {stagedFiles.length > 0 && (
-            <div className="mt-4">
-              <h4 className="text-sm font-medium mb-2">
-                Files pending upload ({stagedFiles.length})
-              </h4>
-              <ul className="space-y-2 mb-4">
-                {stagedFiles.map((file, index) => (
-                  <li
-                    key={index}
-                    className="flex items-center justify-between bg-muted/50 p-2 rounded-md border text-sm"
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <FileText className="size-4 text-muted-foreground shrink-0" />
-                      <span className="truncate">{file.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                      </span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-destructive hover:bg-destructive/10 shrink-0"
-                      onClick={() => removeStagedFile(index)}
-                      disabled={isUploading}
-                    >
-                      <X className="size-3" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-              <Button
-                onClick={handleUpload}
-                disabled={isUploading || stagedFiles.length === 0}
-                className="w-full gap-2"
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" /> Uploading...
-                  </>
-                ) : (
-                  <>
-                    <UploadCloud className="size-4" /> Confirm Upload
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
-        </div>
+        </CanAccess>
 
         {/* Document List */}
         <div>
@@ -333,15 +335,21 @@ export function DocumentDrawer({
                       </TableCell>
                       <TableCell>{getStatusBadge(doc.status)}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => handleDelete(doc.id)}
-                          disabled={isDeleting}
+                        <CanAccess
+                          action="delete"
+                          resource="documents"
+                          fallback={null}
                         >
-                          <Trash2 className="size-4" />
-                        </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDelete(doc.id)}
+                            disabled={isDeleting}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </CanAccess>
                       </TableCell>
                     </TableRow>
                   ))

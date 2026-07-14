@@ -10,6 +10,7 @@ import {
 import routerProvider from "@refinedev/nextjs-router";
 import { useSession, signOut } from "next-auth/react";
 import { customDataProvider } from "./data-provider";
+import { createAccessControlProvider } from "./access-control-provider";
 import { toast } from "sonner";
 
 export function RefineProvider({ children }: { children: React.ReactNode }) {
@@ -56,7 +57,10 @@ export function RefineProvider({ children }: { children: React.ReactNode }) {
     },
     // Hàm xử lý lỗi toàn cục: Khi gọi API bị lỗi 401 hoặc 403, Refine sẽ tự động gọi hàm logout
     onError: async (error) => {
-      if (error.response?.status === 401 || error.response?.status === 403) {
+      if (
+        error.response?.statusCode === 401 ||
+        error.response?.statusCode === 403
+      ) {
         return {
           logout: true,
         };
@@ -65,44 +69,9 @@ export function RefineProvider({ children }: { children: React.ReactNode }) {
     },
   };
 
-  const accessControlProvider: AccessControlProvider = {
-    can: async ({ resource, action }) => {
-      const role = session?.user?.role?.toUpperCase();
-
-      if (role === "SUPER_ADMIN") {
-        return { can: true };
-      }
-
-      if (role === "ADMIN") {
-        if (resource === "organizations") {
-          return { can: false, reason: "Unauthorized" };
-        }
-        return { can: true };
-      }
-
-      if (role === "AGENT") {
-        if (resource === "users" || resource === "organizations") {
-          return { can: false, reason: "Unauthorized" };
-        }
-
-        if (resource === "sites") {
-          if (action === "create" || action === "edit" || action === "delete") {
-            return { can: false, reason: "Unauthorized" };
-          }
-          return { can: true };
-        }
-
-        if (resource === "documents") {
-          if (action === "create" || action === "edit" || action === "delete") {
-            return { can: false, reason: "Unauthorized" };
-          }
-          return { can: true };
-        }
-      }
-
-      return { can: false, reason: "Unauthorized" };
-    },
-  };
+  const accessControlProvider = createAccessControlProvider(
+    session?.user?.role,
+  );
 
   const notificationProvider: NotificationProvider = {
     open: ({ type, message, description }) => {

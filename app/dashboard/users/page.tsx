@@ -1,9 +1,10 @@
 "use client";
 
-import { useTable, useDelete, useSelect } from "@refinedev/core";
+import { useTable, useDelete, useSelect, useCan } from "@refinedev/core";
 import { useForm } from "@refinedev/react-hook-form";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Pencil, Trash2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,22 +28,29 @@ import {
 
 export default function UsersListPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
+
+  const { data: canAccess, isLoading: canAccessLoading } = useCan({
+    resource: "users",
+    action: "list",
+  });
 
   useEffect(() => {
-    if (
-      status === "authenticated" &&
-      session?.user?.role?.toUpperCase() === "AGENT"
-    ) {
-      toast.error("You do not have permission to access User Management.");
-      window.location.href = "/dashboard";
+    if (!canAccessLoading && canAccess?.can === false) {
+      toast.error(
+        canAccess?.reason ||
+          "You do not have permission to access User Management.",
+      );
+      router.replace("/dashboard");
     }
-  }, [session, status]);
+  }, [canAccess, canAccessLoading, router]);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // States cho Form Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [pendingSiteId, setPendingSiteId] = useState<string | null>(null);
 
   // Lưu state input tìm kiếm cục bộ trước khi trigger lọc
   const [searchName, setSearchName] = useState("");
@@ -76,6 +84,15 @@ export default function UsersListPage() {
       enabled: isSuperAdmin, // Only fetch orgs if superadmin
     },
   });
+
+  const { options: siteOptions } = useSelect({
+    resource: "sites",
+    optionLabel: "name",
+    optionValue: "id",
+    queryOptions: {
+      enabled: isSuperAdmin || session?.user?.role?.toUpperCase() === "ADMIN",
+    },
+  });
   // Form setup cho Create / Edit
   const {
     refineCore: { onFinish, formLoading, query },
@@ -88,7 +105,26 @@ export default function UsersListPage() {
       resource: "users",
       action: editId ? "edit" : "create",
       id: editId ?? undefined,
-      onMutationSuccess: () => {
+      onMutationSuccess: async (data) => {
+        if (!editId && pendingSiteId && data?.data?.id) {
+          try {
+            const apiUrl =
+              process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+            const res = await fetch(`${apiUrl}/sites/${pendingSiteId}/agents`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${(session as { accessToken?: string })?.accessToken}`,
+              },
+              body: JSON.stringify({ agentId: data.data.id }),
+            });
+            if (!res.ok) throw new Error("Failed to assign agent");
+            toast.success("User assigned to site successfully!");
+          } catch (err) {
+            console.error("Failed to assign site:", err);
+            toast.error("User created but failed to assign to site.");
+          }
+        }
         handleCloseModal();
       },
     },
@@ -96,6 +132,14 @@ export default function UsersListPage() {
 
   const handleCustomSubmit = (data: Record<string, unknown>) => {
     const payload = { ...data };
+
+    if (payload.siteId) {
+      setPendingSiteId(payload.siteId as string);
+      delete payload.siteId;
+    } else {
+      setPendingSiteId(null);
+    }
+
     if (payload.password === "") {
       delete payload.password;
     }
@@ -153,6 +197,7 @@ export default function UsersListPage() {
       email: "",
       password: "",
       organizationId: "",
+      siteId: "",
     });
     setIsModalOpen(true);
   };
@@ -172,6 +217,7 @@ export default function UsersListPage() {
         password: "",
         role: "agent",
         organizationId: "",
+        siteId: "",
       });
     }, 200); // delay để tránh giật UI khi modal đang đóng
   };
@@ -193,8 +239,8 @@ export default function UsersListPage() {
 
   if (
     status === "loading" ||
-    (status === "authenticated" &&
-      session?.user?.role?.toUpperCase() === "AGENT")
+    canAccessLoading ||
+    (status === "authenticated" && canAccess?.can === false)
   ) {
     return (
       <div className="p-8 text-center text-muted-foreground">
@@ -476,6 +522,25 @@ export default function UsersListPage() {
                   {orgOptions.map((org) => (
                     <option key={org.value} value={org.value}>
                       {org.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {!editId && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Assign to Site (Optional)
+                </label>
+                <select
+                  {...register("siteId")}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <option value="">None</option>
+                  {siteOptions.map((site) => (
+                    <option key={site.value} value={site.value}>
+                      {site.label}
                     </option>
                   ))}
                 </select>

@@ -34,11 +34,17 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
   const [selectedAgentId, setSelectedAgentId] = useState<string>("");
   const [isMutating, setIsMutating] = useState(false);
 
+  const isSuperAdmin = session?.user?.role?.toUpperCase() === "SUPER_ADMIN";
+  const isAdmin = session?.user?.role?.toUpperCase() === "ADMIN";
+
   // Fetch all users then filter by role AGENT on client side
   // (backend role filter can be unreliable due to enum casing)
   const { query: agentsQuery } = useList({
     resource: "users",
     pagination: { mode: "server", currentPage: 1, pageSize: 1000 },
+    queryOptions: {
+      enabled: isSuperAdmin || isAdmin,
+    },
   });
 
   const isAgentsLoading = agentsQuery.isLoading;

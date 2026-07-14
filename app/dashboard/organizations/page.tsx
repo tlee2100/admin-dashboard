@@ -1,9 +1,10 @@
 "use client";
 
-import { useTable, useDelete } from "@refinedev/core";
+import { useTable, useDelete, useCan } from "@refinedev/core";
 import { useForm } from "@refinedev/react-hook-form";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Pencil,
@@ -32,17 +33,23 @@ import {
 } from "@/components/ui/table";
 
 export default function OrganizationListPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
+  const router = useRouter();
+
+  const { data: canAccess, isLoading: canAccessLoading } = useCan({
+    resource: "organizations",
+    action: "list",
+  });
 
   useEffect(() => {
-    if (
-      status === "authenticated" &&
-      session?.user?.role?.toUpperCase() !== "SUPER_ADMIN"
-    ) {
-      toast.error("You do not have permission to access Organizations.");
-      window.location.href = "/dashboard";
+    if (!canAccessLoading && canAccess?.can === false) {
+      toast.error(
+        canAccess?.reason ||
+          "You do not have permission to access Organizations.",
+      );
+      router.replace("/dashboard");
     }
-  }, [session, status]);
+  }, [canAccess, canAccessLoading, router]);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -130,8 +137,8 @@ export default function OrganizationListPage() {
 
   if (
     status === "loading" ||
-    (status === "authenticated" &&
-      session?.user?.role?.toUpperCase() !== "SUPER_ADMIN")
+    canAccessLoading ||
+    (status === "authenticated" && canAccess?.can === false)
   ) {
     return (
       <div className="p-8 text-center text-muted-foreground">
