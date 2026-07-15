@@ -13,6 +13,7 @@ import {
   Building2,
   Globe,
   FileText,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils"; // hàm merge class của Shadcn
 
@@ -32,6 +33,7 @@ const navItems = [
     icon: FileText,
     resource: "documents",
   },
+  { href: "/dashboard/chats", label: "Live Chats", icon: MessageCircle },
   { href: "/dashboard/profile", label: "Profile", icon: UserCircle },
 ];
 
