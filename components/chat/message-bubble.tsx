@@ -24,11 +24,11 @@ export function MessageBubble({ message, isCurrentUser }: MessageBubbleProps) {
         )}
       >
         {/* Avatar */}
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shadow-sm">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shadow-sm">
           {message.senderType === "AGENT" ? (
             <Headset className="w-4 h-4 text-primary" />
           ) : (
-            <User className="w-4 h-4 text-slate-500" />
+            <User className="w-4 h-4 text-slate-500 dark:text-slate-400" />
           )}
         </div>
 
@@ -39,7 +39,7 @@ export function MessageBubble({ message, isCurrentUser }: MessageBubbleProps) {
               "px-4 py-2 rounded-2xl text-sm shadow-sm",
               isCurrentUser
                 ? "bg-primary text-primary-foreground rounded-br-sm"
-                : "bg-white border border-slate-100 text-slate-800 rounded-bl-sm",
+                : "bg-white border border-slate-100 dark:border-slate-700 dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-bl-sm",
             )}
           >
             {message.content}
@@ -47,7 +47,7 @@ export function MessageBubble({ message, isCurrentUser }: MessageBubbleProps) {
 
           <span
             className={cn(
-              "text-[10px] text-slate-400 px-1",
+              "text-[10px] text-slate-400 dark:text-slate-500 px-1",
               isCurrentUser ? "text-right" : "text-left",
             )}
           >

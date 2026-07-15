@@ -46,16 +46,16 @@ export function ChatWidget({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 border rounded-2xl shadow-sm overflow-hidden">
+    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 border rounded-2xl shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="bg-white px-4 py-3 border-b flex justify-between items-center z-10 shadow-sm">
+      <div className="bg-white dark:bg-slate-900 px-4 py-3 border-b flex justify-between items-center z-10 shadow-sm">
         <div className="flex items-center gap-2">
           {isConnected ? (
             <Wifi className="w-4 h-4 text-green-500" />
           ) : (
             <WifiOff className="w-4 h-4 text-red-500" />
           )}
-          <span className="font-semibold text-slate-800">
+          <span className="font-semibold text-slate-800 dark:text-slate-100">
             {isConnected ? "Connected" : "Reconnecting..."}
           </span>
         </div>
@@ -78,7 +78,7 @@ export function ChatWidget({
         ))}
 
         {isTyping && (
-          <div className="flex items-center gap-2 text-slate-400 text-sm italic pl-10">
+          <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 text-sm italic pl-10">
             <span className="flex gap-1">
               <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
               <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-100"></span>
@@ -90,8 +90,8 @@ export function ChatWidget({
       </div>
 
       {/* Input Area */}
-      <div className="bg-white p-3 border-t">
-        <div className="flex gap-2 items-end bg-slate-50 border rounded-xl focus-within:ring-2 focus-within:ring-primary/50 focus-within:bg-white transition-all p-1">
+      <div className="bg-white dark:bg-slate-900 p-3 border-t">
+        <div className="flex gap-2 items-end bg-slate-50 dark:bg-slate-950 border rounded-xl focus-within:ring-2 focus-within:ring-primary/50 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all p-1">
           <Textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}

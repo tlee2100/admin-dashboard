@@ -162,19 +162,28 @@ export function DocumentDrawer({
     switch (status) {
       case "PENDING":
         return (
-          <Badge variant="outline" className="text-yellow-600 bg-yellow-50">
+          <Badge
+            variant="outline"
+            className="text-yellow-600 bg-yellow-50 dark:bg-yellow-900/30 dark:text-yellow-400"
+          >
             <Loader2 className="mr-1 size-3 animate-spin" /> Processing
           </Badge>
         );
       case "READY":
         return (
-          <Badge variant="outline" className="text-green-600 bg-green-50">
+          <Badge
+            variant="outline"
+            className="text-green-600 bg-green-50 dark:bg-green-900/30 dark:text-green-400"
+          >
             <CheckCircle className="mr-1 size-3" /> Ready
           </Badge>
         );
       case "FAILED":
         return (
-          <Badge variant="outline" className="text-red-600 bg-red-50">
+          <Badge
+            variant="outline"
+            className="text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-400"
+          >
             <AlertCircle className="mr-1 size-3" /> Failed
           </Badge>
         );

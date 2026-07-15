@@ -140,25 +140,25 @@ export default function DocumentsListPage() {
     switch (status) {
       case "pending":
         return (
-          <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-md text-xs font-medium">
+          <span className="px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-md text-xs font-medium">
             Pending
           </span>
         );
       case "processing":
         return (
-          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-xs font-medium">
+          <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded-md text-xs font-medium">
             Processing
           </span>
         );
       case "ready":
         return (
-          <span className="px-2 py-1 bg-green-100 text-green-800 rounded-md text-xs font-medium">
+          <span className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded-md text-xs font-medium">
             Ready
           </span>
         );
       default:
         return (
-          <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-md text-xs font-medium">
+          <span className="px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 rounded-md text-xs font-medium">
             {status}
           </span>
         );
@@ -227,7 +227,7 @@ export default function DocumentsListPage() {
         </select>
       </div>
 
-      <div className="rounded-md border bg-white overflow-hidden">
+      <div className="rounded-md border bg-white dark:bg-slate-900 overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -256,7 +256,7 @@ export default function DocumentsListPage() {
                 <TableRow key={doc.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-gray-500" />
+                      <FileText className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                       {doc.filename}
                     </div>
                   </TableCell>
@@ -272,7 +272,7 @@ export default function DocumentsListPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => setDeleteId(doc.id)}
-                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -372,7 +372,7 @@ export default function DocumentsListPage() {
           <DialogHeader>
             <DialogTitle>Delete Document</DialogTitle>
           </DialogHeader>
-          <p className="py-4 text-sm text-gray-500">
+          <p className="py-4 text-sm text-gray-500 dark:text-gray-400">
             Are you sure you want to delete this document? This action cannot be
             undone and data will be permanently lost.
           </p>
