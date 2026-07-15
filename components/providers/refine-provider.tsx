@@ -4,7 +4,6 @@ import React from "react";
 import {
   Refine,
   type AuthProvider,
-  type AccessControlProvider,
   type NotificationProvider,
 } from "@refinedev/core";
 import routerProvider from "@refinedev/nextjs-router";
@@ -130,6 +129,13 @@ export function RefineProvider({ children }: { children: React.ReactNode }) {
           meta: {
             label: "Tài liệu",
             canDelete: true,
+          },
+        },
+        {
+          name: "chat/conversations/active",
+          list: "/dashboard/chats",
+          meta: {
+            label: "Live Chats",
           },
         },
       ]}

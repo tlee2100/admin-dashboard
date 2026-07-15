@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useVisitorChatStore } from "@/types/visitor-chat-store";
-import { Send, MessageSquare } from "lucide-react";
+import { Send, MessageSquare, Loader2 } from "lucide-react";
 
 // Import shadcn components
 import { Button } from "@/components/ui/button";
@@ -24,11 +24,35 @@ export default function ChatLandingPage() {
   const setConversation = useVisitorChatStore((state) => state.setConversation);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isSiteLoading, setIsSiteLoading] = useState(true);
+  const [siteName, setSiteName] = useState<string>("");
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     firstMessage: "",
   });
+
+  useEffect(() => {
+    const fetchSiteInfo = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/sites/public/${siteId}`,
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSiteName(data.name);
+        }
+      } catch (error) {
+        console.error("Failed to fetch site info:", error);
+      } finally {
+        setIsSiteLoading(false);
+      }
+    };
+    if (siteId) {
+      fetchSiteInfo();
+    }
+  }, [siteId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,12 +111,22 @@ export default function ChatLandingPage() {
       <Card className="max-w-md w-full border-slate-200 shadow-lg">
         <CardHeader className="text-center pb-2">
           <div className="mx-auto w-12 h-12 bg-primary rounded-xl flex items-center justify-center mb-4 shadow-sm">
-            <MessageSquare className="w-6 h-6 text-primary-foreground" />
+            {isSiteLoading ? (
+              <Loader2 className="w-6 h-6 text-primary-foreground animate-spin" />
+            ) : (
+              <MessageSquare className="w-6 h-6 text-primary-foreground" />
+            )}
           </div>
-          <CardTitle className="text-2xl font-bold">Hi there! 👋</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            {isSiteLoading
+              ? "Loading..."
+              : siteName
+                ? `Welcome to ${siteName} 👋`
+                : "Hi there! 👋"}
+          </CardTitle>
           <CardDescription>
             We&apos;re here to help. Please fill out the short form below to
-            start chatting with our team.
+            start chatting with {siteName ? "our team" : "us"}.
           </CardDescription>
         </CardHeader>
 

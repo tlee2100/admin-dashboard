@@ -25,11 +25,6 @@ import {
 } from "@/components/ui/card";
 
 const initialState: LoginState = { stage: "credentials" };
-const recaptchaDisabled = process.env.NEXT_PUBLIC_DISABLE_RECAPTCHA === "true";
-
-const recaptchaToken = recaptchaDisabled
-  ? "disabled"
-  : await getRecaptchaToken("login");
 
 export default function LoginPage() {
   const [state, formAction, isActionPending] = useActionState(

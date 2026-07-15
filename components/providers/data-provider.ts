@@ -38,8 +38,11 @@ export const customDataProvider = (
     getApiUrl: () => apiUrl,
 
     // 1. Lấy danh sách (Có phân trang)
-    getList: async ({ resource, pagination, filters, sorters }) => {
+    getList: async ({ resource, pagination, filters, sorters, meta }) => {
       const url = new URL(`${apiUrl}/${resource}`);
+      const isNestjsPaginate =
+        meta?.useNestjsPaginate ??
+        ["sites", "documents", "chat/conversations/active"].includes(resource);
 
       // Map phân trang từ Refine sang NestJS
       if (pagination) {
@@ -65,7 +68,7 @@ export const customDataProvider = (
             filter.value !== undefined &&
             filter.value !== ""
           ) {
-            if (resource === "sites" || resource === "documents") {
+            if (isNestjsPaginate) {
               if (filter.operator === "contains") {
                 url.searchParams.append(
                   `filter.${filter.field}`,
@@ -86,7 +89,7 @@ export const customDataProvider = (
 
       // Map sorters
       if (sorters && sorters.length > 0) {
-        if (resource === "sites" || resource === "documents") {
+        if (isNestjsPaginate) {
           // nestjs-paginate expects: sortBy[0][col]=name&sortBy[0][dir]=ASC
           sorters.forEach((sort, i) => {
             url.searchParams.append(`sortBy[${i}][col]`, sort.field);

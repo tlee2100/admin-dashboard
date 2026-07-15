@@ -15,8 +15,34 @@ export default function AgentChatRoom() {
   const { data: session } = useSession();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const { messagesByConversation, addMessage } = useAgentChatStore();
+  const { messagesByConversation, addMessage, setMessages } =
+    useAgentChatStore();
   const messages = messagesByConversation[conversationId] || [];
+
+  // Fetch conversation history
+  useEffect(() => {
+    const fetchHistory = async () => {
+      if (!session?.accessToken) return;
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/chat/conversations/${conversationId}/messages`,
+          {
+            headers: {
+              Authorization: `Bearer ${session.accessToken}`,
+            },
+          },
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setMessages(conversationId, data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch message history", error);
+      }
+    };
+
+    fetchHistory();
+  }, [conversationId, session?.accessToken, setMessages]);
 
   useEffect(() => {
     if (!session?.accessToken) return;

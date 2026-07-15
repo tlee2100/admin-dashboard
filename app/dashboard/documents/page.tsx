@@ -1,7 +1,6 @@
 "use client";
 
 import { useTable, useDelete, CanAccess, useSelect } from "@refinedev/core";
-import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 import {
   Trash2,
@@ -44,10 +43,6 @@ export default function DocumentsListPage() {
   const [searchName, setSearchName] = useState("");
   const [filterSiteId, setFilterSiteId] = useState("");
   const [debouncedName, setDebouncedName] = useState("");
-
-  const { data: session } = useSession();
-  const role = session?.user?.role?.toUpperCase();
-  const isAdminOrSuper = role === "ADMIN" || role === "SUPER_ADMIN";
 
   const {
     tableQuery,
