@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { io, Socket } from "socket.io-client";
 import { useNotificationsStore } from "@/lib/store/notifications-store";
+import { toast } from "sonner";
 
 export function NotificationSocketProvider({
   children,
@@ -27,7 +28,10 @@ export function NotificationSocketProvider({
     socket.on("connect", () => setStatus("connected"));
     socket.on("disconnect", () => setStatus("disconnected"));
     socket.on("connect_error", () => setStatus("disconnected"));
-    socket.on("notification", (payload) => addNotification(payload));
+    socket.on("notification", (payload) => {
+      addNotification(payload);
+      toast.info(payload.title, { description: payload.message });
+    });
 
     return () => {
       socket.disconnect();

@@ -68,9 +68,7 @@ export function RefineProvider({ children }: { children: React.ReactNode }) {
     },
   };
 
-  const accessControlProvider = createAccessControlProvider(
-    session?.user?.role,
-  );
+  const accessControlProvider = createAccessControlProvider(session?.user);
 
   const notificationProvider: NotificationProvider = {
     open: ({ type, message, description }) => {

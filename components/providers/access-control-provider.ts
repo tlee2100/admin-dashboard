@@ -30,10 +30,11 @@ const ROLES: Record<string, RolePermissions> = {
 };
 
 export const createAccessControlProvider = (
-  role?: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  user?: { role: string; id: number } | any,
 ): AccessControlProvider => ({
-  can: async ({ resource, action }) => {
-    const userRole = role?.toUpperCase();
+  can: async ({ resource, action, params }) => {
+    const userRole = user?.role?.toUpperCase();
 
     // 1. Check if the role exists in our configuration
     if (!userRole || !ROLES[userRole]) {
@@ -60,6 +61,21 @@ export const createAccessControlProvider = (
     // 4. Check if the specific action is denied for this resource
     if (permissions.deniedActions?.[targetResource]?.includes(action)) {
       return { can: false, reason: "Unauthorized" };
+    }
+
+    // 5. Custom object-level permissions
+    if (targetResource === "chat/conversations/active" && action === "delete") {
+      const conversation = params?.conversation;
+      // Only the agent assigned to the conversation can delete it.
+      if (
+        !conversation?.agentId ||
+        String(conversation.agentId) !== String(user?.id)
+      ) {
+        return {
+          can: false,
+          reason: "Only the assigned agent can delete this conversation.",
+        };
+      }
     }
 
     // If it passes all checks, access is granted

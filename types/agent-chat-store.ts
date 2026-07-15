@@ -4,10 +4,12 @@ import { ChatMessage } from "../types/chat";
 
 interface AgentChatState {
   messagesByConversation: Record<string, ChatMessage[]>;
+  typingStatuses: Record<string, boolean>;
   notifications: string[];
 
   addMessage: (conversationId: string, message: ChatMessage) => void;
   setMessages: (conversationId: string, messages: ChatMessage[]) => void;
+  setTyping: (conversationId: string, isTyping: boolean) => void;
   addNotification: (message: string) => void;
   clearNotifications: () => void;
 }
@@ -16,6 +18,7 @@ export const useAgentChatStore = create<AgentChatState>()(
   persist(
     (set) => ({
       messagesByConversation: {},
+      typingStatuses: {},
       notifications: [],
 
       addMessage: (conversationId, message) =>
@@ -35,6 +38,14 @@ export const useAgentChatStore = create<AgentChatState>()(
           messagesByConversation: {
             ...state.messagesByConversation,
             [conversationId]: messages,
+          },
+        })),
+
+      setTyping: (conversationId, isTyping) =>
+        set((state) => ({
+          typingStatuses: {
+            ...state.typingStatuses,
+            [conversationId]: isTyping,
           },
         })),
 

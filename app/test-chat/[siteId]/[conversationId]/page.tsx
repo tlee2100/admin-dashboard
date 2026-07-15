@@ -22,29 +22,41 @@ export default function VisitorChatRoom() {
     isTyping,
     addMessage,
     setConnectionStatus,
+    setConversationStatus,
+    setTyping,
     clearChat,
   } = useVisitorChatStore();
 
+  const isClosed = currentConversation?.status === "CLOSED";
+  const [mounted, setMounted] = useState(false);
+
+  // 1. Handle Hydration
   useEffect(() => {
-    // If they magically landed here without submitting the form first, send them back
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
+
+  // 2. Main Logic: runs only after mounted (so localStorage is read safely)
+  useEffect(() => {
+    if (!mounted) return;
+
+    // If they don't have local storage for this conversation, boot them out
     if (!currentConversation || currentConversation.id !== conversationId) {
       router.push(`/test-chat/${params.siteId}`);
       return;
     }
 
-    // 1. Initialize WebSocket Connection
-    // Assuming your NestJS API runs on localhost:3000
+    // Initialize WebSocket Connection
     const socketInstance = io(
       process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000",
       {
-        query: { conversationId }, // This allows the Gateway to let the Visitor in!
+        query: { conversationId },
       },
     );
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSocket(socketInstance);
 
-    // 2. Bind WebSocket Events to Zustand
     socketInstance.on("connect", () => {
       console.log("Connected to chat server!");
       setConnectionStatus(true);
@@ -62,9 +74,6 @@ export default function VisitorChatRoom() {
         message: string;
         senderType: "VISITOR" | "AGENT";
       }) => {
-        // payload from server: { conversationId, message, senderType }
-
-        // We only care about messages in this specific conversation
         if (payload.conversationId === conversationId) {
           addMessage({
             id: uuidv4(),
@@ -77,17 +86,36 @@ export default function VisitorChatRoom() {
       },
     );
 
+    socketInstance.on(
+      "typing",
+      (payload: { conversationId: string; isTyping: boolean }) => {
+        if (payload.conversationId === conversationId) {
+          setTyping(payload.isTyping);
+        }
+      },
+    );
+
+    socketInstance.on("conversationClosed", (payload: { id: string }) => {
+      if (payload.id === conversationId) {
+        setConversationStatus("CLOSED");
+        setTyping(false);
+      }
+    });
+
     // Cleanup on unmount
     return () => {
       socketInstance.disconnect();
     };
   }, [
+    mounted,
     conversationId,
     currentConversation,
     router,
     params.siteId,
     setConnectionStatus,
     addMessage,
+    setTyping,
+    setConversationStatus,
   ]);
 
   // 3. Handle sending a message FROM the widget TO the server
@@ -112,6 +140,11 @@ export default function VisitorChatRoom() {
     });
   };
 
+  const handleTyping = (typing: boolean) => {
+    if (!socket || !isConnected) return;
+    socket.emit("typing", { conversationId, isTyping: typing });
+  };
+
   const handleEndChat = () => {
     if (confirm("Are you sure you want to end this chat?")) {
       if (socket) socket.disconnect();
@@ -129,8 +162,10 @@ export default function VisitorChatRoom() {
           messages={messages}
           isConnected={isConnected}
           isTyping={isTyping}
+          isClosed={isClosed}
           currentUserType="VISITOR"
           onSendMessage={handleSendMessage}
+          onTyping={handleTyping}
           onEndChat={handleEndChat}
         />
       </div>

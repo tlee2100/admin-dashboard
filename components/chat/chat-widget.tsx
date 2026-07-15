@@ -14,6 +14,10 @@ interface ChatWidgetProps {
   currentUserType: "VISITOR" | "AGENT";
   onSendMessage: (message: string) => void;
   onEndChat?: () => void; // Used by visitor to end chat
+  onCloseChat?: () => void; // Used by agent
+  onDeleteChat?: () => void; // Used by agent
+  onTyping?: (isTyping: boolean) => void;
+  isClosed?: boolean;
 }
 
 export function ChatWidget({
@@ -23,9 +27,14 @@ export function ChatWidget({
   currentUserType,
   onSendMessage,
   onEndChat,
+  onCloseChat,
+  onDeleteChat,
+  onTyping,
+  isClosed,
 }: ChatWidgetProps) {
   const [inputValue, setInputValue] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-scroll to bottom whenever messages change
   useEffect(() => {
@@ -36,6 +45,19 @@ export function ChatWidget({
     if (!inputValue.trim()) return;
     onSendMessage(inputValue.trim());
     setInputValue("");
+    if (onTyping) onTyping(false);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputValue(e.target.value);
+    if (onTyping) {
+      onTyping(true);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        onTyping(false);
+      }, 2000);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -60,10 +82,42 @@ export function ChatWidget({
           </span>
         </div>
 
-        {onEndChat && currentUserType === "VISITOR" && (
-          <Button variant="destructive" size="sm" onClick={onEndChat}>
+        {onEndChat && (
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={onEndChat}
+            disabled={isClosed}
+          >
             End Chat
           </Button>
+        )}
+
+        {currentUserType === "AGENT" && (
+          <div className="flex gap-2">
+            {onCloseChat && (
+              <Button variant="outline" size="sm" onClick={onCloseChat}>
+                Close Window
+              </Button>
+            )}
+            {onDeleteChat && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => {
+                  if (
+                    confirm(
+                      "Are you sure you want to permanently delete this chat?",
+                    )
+                  ) {
+                    onDeleteChat();
+                  }
+                }}
+              >
+                Delete Chat
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -91,25 +145,31 @@ export function ChatWidget({
 
       {/* Input Area */}
       <div className="bg-white dark:bg-slate-900 p-3 border-t">
-        <div className="flex gap-2 items-end bg-slate-50 dark:bg-slate-950 border rounded-xl focus-within:ring-2 focus-within:ring-primary/50 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all p-1">
-          <Textarea
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type your message..."
-            className="min-h-[40px] max-h-[120px] resize-none border-0 shadow-none focus-visible:ring-0 bg-transparent text-sm py-3"
-            rows={1}
-            disabled={!isConnected}
-          />
-          <Button
-            size="icon"
-            className="rounded-lg mb-1 mr-1 h-9 w-9 shrink-0"
-            onClick={handleSend}
-            disabled={!inputValue.trim() || !isConnected}
-          >
-            <Send className="w-4 h-4" />
-          </Button>
-        </div>
+        {isClosed ? (
+          <div className="p-3 text-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-sm">
+            This conversation is closed. You can no longer send messages.
+          </div>
+        ) : (
+          <div className="flex gap-2 items-end bg-slate-50 dark:bg-slate-950 border rounded-xl focus-within:ring-2 focus-within:ring-primary/50 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all p-1">
+            <Textarea
+              value={inputValue}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Type your message..."
+              className="min-h-[40px] max-h-[120px] resize-none border-0 shadow-none focus-visible:ring-0 bg-transparent text-sm py-3"
+              rows={1}
+              disabled={!isConnected}
+            />
+            <Button
+              size="icon"
+              className="rounded-lg mb-1 mr-1 h-9 w-9 shrink-0"
+              onClick={handleSend}
+              disabled={!inputValue.trim() || !isConnected}
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

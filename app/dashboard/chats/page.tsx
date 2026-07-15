@@ -1,13 +1,19 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { io } from "socket.io-client";
-import { useTable, useSelect, useInvalidate } from "@refinedev/core";
+import { useTable, useSelect, useInvalidate, CanAccess } from "@refinedev/core";
 import { Conversation } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { MessageCircle, User, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  MessageCircle,
+  User,
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 
@@ -16,6 +22,9 @@ export default function AgentInboxPage() {
   const { data: session } = useSession();
   const invalidate = useInvalidate();
 
+  const [siteFilter, setSiteFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("OPEN");
+
   // Use Refine's useTable hook to fetch, paginate, and filter our resource
   const { tableQuery, currentPage, setCurrentPage, pageCount, setFilters } =
     useTable<Conversation>({
@@ -23,6 +32,15 @@ export default function AgentInboxPage() {
       pagination: {
         currentPage: 1,
         pageSize: 10,
+      },
+      filters: {
+        initial: [
+          {
+            field: "status",
+            operator: "eq",
+            value: "OPEN",
+          },
+        ],
       },
       syncWithLocation: false, // We don't need query params for this internal dashboard view
     });
@@ -37,6 +55,27 @@ export default function AgentInboxPage() {
     optionLabel: "name",
     optionValue: "id",
   });
+
+  useEffect(() => {
+    // Sync local state filters to Refine
+    const filters = [];
+    if (siteFilter !== "all") {
+      filters.push({
+        field: "siteId",
+        operator: "eq",
+        value: parseInt(siteFilter, 10),
+      });
+    }
+    if (statusFilter !== "all") {
+      filters.push({
+        field: "status",
+        operator: "eq",
+        value: statusFilter,
+      });
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setFilters(filters as any, "replace");
+  }, [siteFilter, statusFilter, setFilters]);
 
   // Socket setup for real-time invalidation
   useEffect(() => {
@@ -64,26 +103,44 @@ export default function AgentInboxPage() {
       });
     });
 
+    socketInstance.on("conversationAssigned", () => {
+      invalidate({
+        resource: "chat/conversations/active",
+        invalidates: ["list"],
+      });
+    });
+
     return () => {
       socketInstance.disconnect();
     };
   }, [session?.accessToken, invalidate]);
 
-  const handleSiteFilter = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    if (value === "all") {
-      setFilters([], "replace");
-    } else {
-      setFilters(
-        [
-          {
-            field: "siteId",
-            operator: "eq",
-            value: parseInt(value, 10),
+  const handleDeleteChat = async (conversationId: string) => {
+    if (!session?.accessToken) return;
+    if (!confirm("Are you sure you want to permanently delete this chat?"))
+      return;
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/chat/conversations/${conversationId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${session.accessToken}`,
           },
-        ],
-        "replace",
+        },
       );
+      if (res.ok) {
+        invalidate({
+          resource: "chat/conversations/active",
+          invalidates: ["list"],
+        });
+      } else {
+        alert("Failed to delete chat");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error deleting chat");
     }
   };
 
@@ -93,14 +150,24 @@ export default function AgentInboxPage() {
         <div>
           <h1 className="text-2xl font-bold">Live Chat Inbox</h1>
           <p className="text-muted-foreground">
-            Active visitor conversations waiting for you
+            Manage your visitor conversations
           </p>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
           <select
-            onChange={handleSiteFilter}
-            defaultValue="all"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="flex h-10 w-full sm:w-[130px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="OPEN">Open</option>
+            <option value="CLOSED">Closed</option>
+            <option value="all">All Status</option>
+          </select>
+
+          <select
+            value={siteFilter}
+            onChange={(e) => setSiteFilter(e.target.value)}
             className="flex h-10 w-full sm:w-[180px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <option value="all">All Sites</option>
@@ -112,7 +179,7 @@ export default function AgentInboxPage() {
           </select>
 
           <Badge variant="secondary" className="text-sm px-3 py-1 shrink-0">
-            {totalCount} Active
+            {totalCount} Total
           </Badge>
         </div>
       </div>
@@ -153,12 +220,28 @@ export default function AgentInboxPage() {
                   >
                     {conv.status}
                   </Badge>
-                  <Button
-                    size="sm"
-                    onClick={() => router.push(`/dashboard/chats/${conv.id}`)}
-                  >
-                    Join Chat
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => router.push(`/dashboard/chats/${conv.id}`)}
+                    >
+                      Join Chat
+                    </Button>
+                    <CanAccess
+                      action="delete"
+                      resource="chat/conversations/active"
+                      params={{ conversation: conv }}
+                    >
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteChat(conv.id)}
+                        title="Delete Chat"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </CanAccess>
+                  </div>
                 </div>
               </CardContent>
             </Card>

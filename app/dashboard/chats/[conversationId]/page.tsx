@@ -15,15 +15,37 @@ export default function AgentChatRoom() {
   const { data: session } = useSession();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const { messagesByConversation, addMessage, setMessages } =
-    useAgentChatStore();
+  const [isClosed, setIsClosed] = useState(false);
+  const {
+    messagesByConversation,
+    typingStatuses,
+    addMessage,
+    setMessages,
+    setTyping,
+  } = useAgentChatStore();
   const messages = messagesByConversation[conversationId] || [];
+  const isTyping = typingStatuses[conversationId] || false;
 
-  // Fetch conversation history
+  // Fetch conversation history and status
   useEffect(() => {
-    const fetchHistory = async () => {
+    const fetchHistoryAndStatus = async () => {
       if (!session?.accessToken) return;
       try {
+        // Fetch status
+        const infoRes = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/chat/conversations/${conversationId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${session.accessToken}`,
+            },
+          },
+        );
+        if (infoRes.ok) {
+          const info = await infoRes.json();
+          setIsClosed(info.status === "CLOSED");
+        }
+
+        // Fetch messages
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/chat/conversations/${conversationId}/messages`,
           {
@@ -37,11 +59,11 @@ export default function AgentChatRoom() {
           setMessages(conversationId, data);
         }
       } catch (error) {
-        console.error("Failed to fetch message history", error);
+        console.error("Failed to fetch conversation data", error);
       }
     };
 
-    fetchHistory();
+    fetchHistoryAndStatus();
   }, [conversationId, session?.accessToken, setMessages]);
 
   useEffect(() => {
@@ -90,10 +112,25 @@ export default function AgentChatRoom() {
       router.push("/dashboard/chats");
     });
 
+    socketInstance.on(
+      "typing",
+      (payload: { conversationId: string; isTyping: boolean }) => {
+        if (payload.conversationId === conversationId) {
+          setTyping(conversationId, payload.isTyping);
+        }
+      },
+    );
+
+    socketInstance.on("conversationClosed", (payload: { id: string }) => {
+      if (payload.id === conversationId) {
+        setIsClosed(true);
+      }
+    });
+
     return () => {
       socketInstance.disconnect();
     };
-  }, [session?.accessToken, conversationId, addMessage, router]);
+  }, [session?.accessToken, conversationId, addMessage, setTyping, router]);
 
   const handleSendMessage = (text: string) => {
     if (!socket || !isConnected) return;
@@ -115,15 +152,54 @@ export default function AgentChatRoom() {
     });
   };
 
+  const handleTyping = (typing: boolean) => {
+    if (!socket || !isConnected) return;
+    socket.emit("typing", { conversationId, isTyping: typing });
+  };
+
+  const handleEndChat = async () => {
+    if (!window.confirm("Are you sure you want to end this conversation?")) {
+      return;
+    }
+
+    if (!session?.accessToken) return;
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/chat/conversations/${conversationId}/close`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${session.accessToken}`,
+          },
+        },
+      );
+      if (res.ok) {
+        setIsClosed(true);
+      } else {
+        alert("Failed to end chat");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error ending chat");
+    }
+  };
+
+  const handleCloseWindow = () => {
+    router.push("/dashboard/chats");
+  };
+
   return (
     <div className="h-[calc(100vh-4rem)] p-4">
       <ChatWidget
         messages={messages}
         isConnected={isConnected}
-        isTyping={false}
+        isTyping={isTyping}
+        isClosed={isClosed}
         currentUserType="AGENT"
         onSendMessage={handleSendMessage}
-        // No onEndChat here — only visitor ends the chat
+        onTyping={handleTyping}
+        onEndChat={handleEndChat}
+        onCloseChat={handleCloseWindow}
       />
     </div>
   );
