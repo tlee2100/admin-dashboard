@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import { ChatMessage, Conversation } from "../types/chat";
 
 interface VisitorChatState {
@@ -103,7 +103,8 @@ export const useVisitorChatStore = create<VisitorChatState>()(
         set({ currentConversation: null, messages: [], isConnected: false }),
     }),
     {
-      name: "visitor-chat-storage", // kebab-case for local storage key
+      name: "visitor_chat_storage", // using underscore as requested by the user for visitor_conversation_id conceptually, but here we just rename it
+      storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         currentConversation: state.currentConversation,
         messages: state.messages,

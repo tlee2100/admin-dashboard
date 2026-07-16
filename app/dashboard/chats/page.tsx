@@ -42,6 +42,14 @@ export default function AgentInboxPage() {
           },
         ],
       },
+      sorters: {
+        initial: [
+          {
+            field: "lastActivityAt",
+            order: "desc",
+          },
+        ],
+      },
       syncWithLocation: false, // We don't need query params for this internal dashboard view
     });
 
@@ -104,6 +112,13 @@ export default function AgentInboxPage() {
     });
 
     socketInstance.on("conversationAssigned", () => {
+      invalidate({
+        resource: "chat/conversations/active",
+        invalidates: ["list"],
+      });
+    });
+
+    socketInstance.on("conversationActivity", () => {
       invalidate({
         resource: "chat/conversations/active",
         invalidates: ["list"],
@@ -207,10 +222,20 @@ export default function AgentInboxPage() {
                     <p className="text-sm text-muted-foreground">
                       {conv.visitorEmail}
                     </p>
+                    {conv.latestMessage && (
+                      <p className="text-sm text-foreground mt-1 line-clamp-1 italic">
+                        &quot;{conv.latestMessage.content}&quot;
+                      </p>
+                    )}
                     <p className="text-xs font-medium text-primary/80 mt-1">
                       Site:{" "}
                       {siteOptions?.find((opt) => opt.value == conv.siteId)
                         ?.label || `ID: ${conv.siteId}`}
+                      {" • "}
+                      {new Date(conv.lastActivityAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </p>
                   </div>
                 </div>

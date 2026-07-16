@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useLayoutEffect,
+} from "react";
 import { ChatMessage } from "@/types/chat";
 import { MessageBubble } from "./message-bubble";
 import {
@@ -14,7 +20,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 
 interface ChatWidgetProps {
   messages: ChatMessage[];
@@ -32,7 +37,7 @@ interface ChatWidgetProps {
   onDeleteChat?: () => void; // Used by agent
   onPauseChat?: () => void;
   onReactMessage?: (messageId: string, emoji: string) => void;
-  onLoadMore?: () => void;
+  onLoadMore?: () => void | Promise<void>;
   onTyping?: (isTyping: boolean) => void;
   isClosed?: boolean;
   isPaused?: boolean;
@@ -59,44 +64,101 @@ export function ChatWidget({
   const [inputValue, setInputValue] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isFetchingHistory, setIsFetchingHistory] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isPrependingRef = useRef(false);
+  const prevScrollHeightRef = useRef(0);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-scroll to bottom whenever messages change (only if near bottom)
+  // Auto-scroll to bottom only for NEW messages (not when prepending history)
   useEffect(() => {
-    // Only scroll if we are not looking at history
+    if (isPrependingRef.current) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (e.currentTarget.scrollTop < 50 && onLoadMore) {
-      onLoadMore();
+  // After prepending older messages, restore the scroll position synchronously before paint
+  useLayoutEffect(() => {
+    if (!isPrependingRef.current) return;
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.scrollTop =
+        container.scrollHeight - prevScrollHeightRef.current;
+    }
+    isPrependingRef.current = false;
+  }, [messages]);
+
+  // Called by parent right BEFORE prepending older messages
+  const prepareForPrepend = useCallback(() => {
+    isPrependingRef.current = true;
+    prevScrollHeightRef.current = scrollContainerRef.current?.scrollHeight ?? 0;
+  }, []);
+
+  const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
+    if (e.currentTarget.scrollTop < 50 && onLoadMore && !isFetchingHistory) {
+      setIsFetchingHistory(true);
+      prepareForPrepend();
+      try {
+        await onLoadMore();
+      } finally {
+        setIsFetchingHistory(false);
+        // Fallback: reset the ref if no messages were actually added
+        setTimeout(() => {
+          isPrependingRef.current = false;
+        }, 100);
+      }
     }
   };
 
-  const handleFileUpload = async (file: File) => {
-    if (!file) return;
+  const handleFileUpload = async (files: FileList | File[]) => {
+    if (!files || files.length === 0) return;
+
+    const fileArray = Array.from(files);
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+    // Pre-validate file sizes
+    for (const file of fileArray) {
+      if (file.size > MAX_FILE_SIZE) {
+        alert("The file is out of limit 10MB");
+        return;
+      }
+    }
+
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        const formData = new FormData();
+        formData.append("file", file);
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/chat/upload`,
-        {
-          method: "POST",
-          body: formData,
-        },
-      );
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/chat/upload`,
+          {
+            method: "POST",
+            body: formData,
+          },
+        );
 
-      if (!res.ok) throw new Error("Upload failed");
-      const data = await res.json();
+        if (res.status === 413) {
+          throw new Error("The file is out of limit");
+        }
+        if (!res.ok) throw new Error("Upload failed");
+        const data = await res.json();
 
-      onSendMessage(inputValue.trim(), data.url, data.fileName, data.fileType);
+        // Only send the text input with the first file
+        const textToSend = i === 0 ? inputValue.trim() : "";
+        onSendMessage(textToSend, data.url, data.fileName, data.fileType);
+      }
+
+      // Clear input after sending all files
       setInputValue("");
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
-      alert("Failed to upload file");
+      if (err instanceof Error) {
+        alert(err.message || "Failed to upload files");
+      } else {
+        alert("Failed to upload files");
+      }
     } finally {
       setIsUploading(false);
     }
@@ -115,14 +177,14 @@ export function ChatWidget({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileUpload(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileUpload(e.dataTransfer.files);
     }
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFileUpload(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      handleFileUpload(e.target.files);
     }
   };
 
@@ -251,6 +313,7 @@ export function ChatWidget({
 
       {/* Message List */}
       <div
+        ref={scrollContainerRef}
         className="flex-1 overflow-y-auto p-4 space-y-4 relative"
         onScroll={handleScroll}
         onDragOver={handleDragOver}
@@ -304,6 +367,7 @@ export function ChatWidget({
             <label className="cursor-pointer p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg shrink-0 mb-0.5 ml-0.5">
               <input
                 type="file"
+                multiple
                 className="hidden"
                 onChange={handleFileInput}
                 disabled={!isConnected || isUploading}

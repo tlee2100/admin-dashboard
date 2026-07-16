@@ -118,6 +118,103 @@ export function Sidebar() {
           return <React.Fragment key={href}>{linkNode}</React.Fragment>;
         })}
       </nav>
+
+      {/* Active Chats Section */}
+      {sidebarOpen && (
+        <div className="mt-4 px-4 flex flex-col overflow-hidden">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            Active Chats
+          </div>
+          <ActiveChatsList />
+        </div>
+      )}
     </aside>
+  );
+}
+
+import { useList } from "@refinedev/core";
+import { Conversation } from "@/types/chat";
+
+function ActiveChatsList() {
+  const pathname = usePathname();
+
+  const { data: queryResult, isLoading } = useList<Conversation>({
+    resource: "chat/conversations/active",
+    pagination: {
+      currentPage: 1,
+      pageSize: 5,
+    },
+    sorters: [
+      {
+        field: "lastActivityAt",
+        order: "desc",
+      },
+    ],
+    filters: [
+      {
+        field: "status",
+        operator: "eq",
+        value: "OPEN",
+      },
+    ],
+  }).query;
+
+  if (isLoading) {
+    return <div className="text-sm text-muted-foreground">Loading...</div>;
+  }
+
+  const conversations = queryResult?.data || [];
+
+  if (conversations.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground italic">
+        No active chats
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1 overflow-y-auto max-h-[250px] pr-1">
+      {conversations.map((conv) => {
+        const href = `/dashboard/chats/${conv.id}`;
+        const active = pathname === href;
+        return (
+          <Link
+            key={conv.id}
+            href={href}
+            className={cn(
+              "flex flex-col rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-muted",
+              active
+                ? "bg-muted border-l-2 border-primary"
+                : "text-muted-foreground",
+            )}
+            title={conv.visitorName}
+          >
+            <div className="flex justify-between items-center w-full">
+              <span className="truncate flex-1 font-semibold text-foreground">
+                {conv.visitorName}
+              </span>
+              <span className="text-[10px] whitespace-nowrap opacity-70 ml-2">
+                {new Date(conv.lastActivityAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            </div>
+            {conv.latestMessage && (
+              <span className="truncate text-xs font-normal opacity-80 mt-0.5 italic">
+                {conv.latestMessage.content}
+              </span>
+            )}
+          </Link>
+        );
+      })}
+      <Link
+        href="/dashboard/chats"
+        className="text-xs text-primary mt-2 hover:underline"
+      >
+        View all chats
+      </Link>
+    </div>
   );
 }

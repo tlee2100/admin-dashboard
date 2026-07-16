@@ -90,12 +90,11 @@ export const customDataProvider = (
       // Map sorters
       if (sorters && sorters.length > 0) {
         if (isNestjsPaginate) {
-          // nestjs-paginate expects: sortBy[0][col]=name&sortBy[0][dir]=ASC
-          sorters.forEach((sort, i) => {
-            url.searchParams.append(`sortBy[${i}][col]`, sort.field);
+          // nestjs-paginate expects: sortBy=field:DIR
+          sorters.forEach((sort) => {
             url.searchParams.append(
-              `sortBy[${i}][dir]`,
-              sort.order.toUpperCase(),
+              "sortBy",
+              `${sort.field}:${sort.order.toUpperCase()}`,
             );
           });
         } else {

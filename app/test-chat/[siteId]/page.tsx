@@ -88,6 +88,7 @@ export default function ChatLandingPage() {
           status: "OPEN" as const,
           visitorName: data.visitorName,
           visitorEmail: data.visitorEmail,
+          lastActivityAt: new Date().toISOString(),
         },
         {
           id: data.firstMessage.id,

@@ -140,7 +140,7 @@ export const useAgentChatStore = create<AgentChatState>()(
     {
       name: "agent-chat-storage",
       partialize: (state) => ({
-        messagesByConversation: state.messagesByConversation,
+        // Only persist pending (offline) messages — chat history is always fetched fresh from the server
         pendingMessages: state.pendingMessages,
       }),
     },

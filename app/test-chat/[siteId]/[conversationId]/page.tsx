@@ -38,6 +38,7 @@ export default function VisitorChatRoom() {
   const isClosed = currentConversation?.status === "CLOSED";
   const isPaused = currentConversation?.status === "PAUSED";
   const [mounted, setMounted] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
 
   // 1. Handle Hydration
   useEffect(() => {
@@ -264,7 +265,7 @@ export default function VisitorChatRoom() {
             fileType: parsed.fileType,
             senderType: "VISITOR",
           });
-        } catch (e) {
+        } catch {
           socket.emit("sendMessage", {
             conversationId,
             message: text,
@@ -352,6 +353,40 @@ export default function VisitorChatRoom() {
     socket.emit("typing", { conversationId, isTyping: typing });
   };
 
+  const handleLoadMore = async () => {
+    if (!hasMore || messages.length === 0) return;
+
+    // Find the oldest message currently in React state
+    const oldestMessage = messages[0];
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/chat/conversations/${conversationId}/messages?cursor=${oldestMessage.createdAt}&limit=10`,
+      );
+      if (!res.ok) throw new Error("Failed to fetch messages");
+
+      const data = await res.json();
+
+      // If we got fewer than limit, there are no more older messages
+      if (data.data.length < 10) {
+        setHasMore(false);
+      }
+
+      if (data.data.length > 0) {
+        // The API returns messages ordered by createdAt DESC (newest first).
+        // Since we are fetching older messages, we want them in chronological order
+        // to prepend them correctly, so we reverse the array.
+        // Wait, if we prepend, we just need to pass the chronological array.
+        const olderMessages = [...data.data].reverse();
+
+        // Update the Zustand store (which syncs to sessionStorage)
+        useVisitorChatStore.getState().prependMessages(olderMessages);
+      }
+    } catch (err) {
+      console.error("Failed to load more messages:", err);
+    }
+  };
+
   const handleEndChat = () => {
     if (confirm("Are you sure you want to end this chat?")) {
       if (socket) socket.disconnect();
@@ -389,6 +424,7 @@ export default function VisitorChatRoom() {
           onPauseChat={handlePauseChat}
           onTyping={handleTyping}
           onEndChat={handleEndChat}
+          onLoadMore={handleLoadMore}
         />
       </div>
     </div>

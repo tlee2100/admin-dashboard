@@ -19,4 +19,6 @@ export interface Conversation {
   status: "OPEN" | "PAUSED" | "CLOSED";
   visitorName: string;
   visitorEmail: string;
+  lastActivityAt: string;
+  latestMessage?: ChatMessage;
 }

@@ -8,6 +8,10 @@ import { useAgentChatStore } from "@/types/agent-chat-store";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { v4 as uuidv4 } from "uuid";
 
+const PAGE_LIMIT = process.env.NEXT_PUBLIC_CHAT_PAGE_SIZE
+  ? parseInt(process.env.NEXT_PUBLIC_CHAT_PAGE_SIZE as string, 10)
+  : 10;
+
 export default function AgentChatRoom() {
   const params = useParams();
   const router = useRouter();
@@ -70,7 +74,7 @@ export default function AgentChatRoom() {
 
         // Fetch messages
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/chat/conversations/${conversationId}/messages`,
+          `${process.env.NEXT_PUBLIC_API_URL}/chat/conversations/${conversationId}/messages?limit=${PAGE_LIMIT}`,
           {
             headers: {
               Authorization: `Bearer ${session.accessToken}`,
@@ -281,7 +285,7 @@ export default function AgentChatRoom() {
             fileType: parsed.fileType,
             senderType: "AGENT",
           });
-        } catch (e) {
+        } catch {
           socket.emit("sendMessage", {
             conversationId,
             message: text,
@@ -360,7 +364,7 @@ export default function AgentChatRoom() {
     try {
       const oldestMessage = messages[0];
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/chat/conversations/${conversationId}/messages?cursor=${oldestMessage.createdAt}&limit=50`,
+        `${process.env.NEXT_PUBLIC_API_URL}/chat/conversations/${conversationId}/messages?cursor=${oldestMessage.createdAt}&limit=${PAGE_LIMIT}`,
         {
           headers: {
             Authorization: `Bearer ${session.accessToken}`,
