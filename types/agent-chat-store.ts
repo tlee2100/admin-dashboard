@@ -23,6 +23,12 @@ interface AgentChatState {
     messageId: string,
     reactions: Record<string, string[]>,
   ) => void;
+  replaceMessageId: (
+    conversationId: string,
+    localId: string,
+    realId: string,
+    status?: string,
+  ) => void;
   addPendingMessage: (conversationId: string, message: string) => void;
   clearPendingMessages: (conversationId: string) => void;
   setOtherPartyOnline: (conversationId: string, online: boolean) => void;
@@ -100,6 +106,21 @@ export const useAgentChatStore = create<AgentChatState>()(
               ...state.messagesByConversation,
               [conversationId]: messages.map((m) =>
                 m.id === messageId ? { ...m, reactions } : m,
+              ),
+            },
+          };
+        }),
+
+      replaceMessageId: (conversationId, localId, realId, status) =>
+        set((state) => {
+          const messages = state.messagesByConversation[conversationId] || [];
+          return {
+            messagesByConversation: {
+              ...state.messagesByConversation,
+              [conversationId]: messages.map((m) =>
+                m.id === localId
+                  ? { ...m, id: realId, status: status ?? m.status }
+                  : m,
               ),
             },
           };

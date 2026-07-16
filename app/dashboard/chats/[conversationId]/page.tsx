@@ -35,6 +35,7 @@ export default function AgentChatRoom() {
     setOtherPartyOnline,
     updateMessageStatus,
     updateMessageReactions,
+    replaceMessageId,
   } = useAgentChatStore();
   const messages = useMemo(
     () => messagesByConversation[conversationId] || [],
@@ -241,6 +242,28 @@ export default function AgentChatRoom() {
       },
     );
 
+    socketInstance.on(
+      "messageSaved",
+      (payload: {
+        localId?: string;
+        id: string;
+        status?: string;
+        fileUrl?: string;
+        fileName?: string;
+        fileType?: string;
+        reactions?: Record<string, string[]>;
+      }) => {
+        if (payload.localId) {
+          replaceMessageId(
+            conversationId,
+            payload.localId,
+            payload.id,
+            payload.status,
+          );
+        }
+      },
+    );
+
     const handleFocus = () => {
       if (!socketInstance.connected) return;
       messagesRef.current.forEach((m) => {
@@ -267,6 +290,7 @@ export default function AgentChatRoom() {
     setOtherPartyOnline,
     updateMessageStatus,
     updateMessageReactions,
+    replaceMessageId,
     router,
     setMessages,
   ]);
@@ -284,6 +308,7 @@ export default function AgentChatRoom() {
             fileName: parsed.fileName,
             fileType: parsed.fileType,
             senderType: "AGENT",
+            localId: parsed.localId,
           });
         } catch {
           socket.emit("sendMessage", {
@@ -303,9 +328,11 @@ export default function AgentChatRoom() {
     fileName?: string,
     fileType?: string,
   ) => {
+    const localId = uuidv4();
+
     // Add to local state immediately for instant feedback
     addMessage(conversationId, {
-      id: uuidv4(),
+      id: localId,
       conversationId,
       content: text,
       fileUrl,
@@ -319,7 +346,7 @@ export default function AgentChatRoom() {
     if (!socket || !isConnected) {
       addPendingMessage(
         conversationId,
-        JSON.stringify({ content: text, fileUrl, fileName, fileType }),
+        JSON.stringify({ content: text, fileUrl, fileName, fileType, localId }),
       );
       return;
     }
@@ -332,6 +359,7 @@ export default function AgentChatRoom() {
       fileName,
       fileType,
       senderType: "AGENT",
+      localId,
     });
   };
 
