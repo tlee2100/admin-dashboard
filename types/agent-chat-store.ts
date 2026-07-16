@@ -5,11 +5,21 @@ import { ChatMessage } from "../types/chat";
 interface AgentChatState {
   messagesByConversation: Record<string, ChatMessage[]>;
   typingStatuses: Record<string, boolean>;
+  pendingMessages: Record<string, string[]>;
+  otherPartyOnline: Record<string, boolean>;
   notifications: string[];
 
   addMessage: (conversationId: string, message: ChatMessage) => void;
   setMessages: (conversationId: string, messages: ChatMessage[]) => void;
   setTyping: (conversationId: string, isTyping: boolean) => void;
+  updateMessageStatus: (
+    conversationId: string,
+    messageId: string,
+    status: string,
+  ) => void;
+  addPendingMessage: (conversationId: string, message: string) => void;
+  clearPendingMessages: (conversationId: string) => void;
+  setOtherPartyOnline: (conversationId: string, online: boolean) => void;
   addNotification: (message: string) => void;
   clearNotifications: () => void;
 }
@@ -19,6 +29,8 @@ export const useAgentChatStore = create<AgentChatState>()(
     (set) => ({
       messagesByConversation: {},
       typingStatuses: {},
+      pendingMessages: {},
+      otherPartyOnline: {},
       notifications: [],
 
       addMessage: (conversationId, message) =>
@@ -49,6 +61,46 @@ export const useAgentChatStore = create<AgentChatState>()(
           },
         })),
 
+      updateMessageStatus: (conversationId, messageId, status) =>
+        set((state) => {
+          const messages = state.messagesByConversation[conversationId] || [];
+          return {
+            messagesByConversation: {
+              ...state.messagesByConversation,
+              [conversationId]: messages.map((m) =>
+                m.id === messageId ? { ...m, status } : m,
+              ),
+            },
+          };
+        }),
+
+      addPendingMessage: (conversationId, message) =>
+        set((state) => {
+          const pending = state.pendingMessages[conversationId] || [];
+          return {
+            pendingMessages: {
+              ...state.pendingMessages,
+              [conversationId]: [...pending, message],
+            },
+          };
+        }),
+
+      clearPendingMessages: (conversationId) =>
+        set((state) => ({
+          pendingMessages: {
+            ...state.pendingMessages,
+            [conversationId]: [],
+          },
+        })),
+
+      setOtherPartyOnline: (conversationId, online) =>
+        set((state) => ({
+          otherPartyOnline: {
+            ...state.otherPartyOnline,
+            [conversationId]: online,
+          },
+        })),
+
       addNotification: (message) =>
         set((state) => ({ notifications: [...state.notifications, message] })),
 
@@ -58,6 +110,7 @@ export const useAgentChatStore = create<AgentChatState>()(
       name: "agent-chat-storage",
       partialize: (state) => ({
         messagesByConversation: state.messagesByConversation,
+        pendingMessages: state.pendingMessages,
       }),
     },
   ),

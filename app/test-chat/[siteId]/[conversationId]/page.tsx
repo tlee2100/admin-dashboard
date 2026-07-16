@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 import { useVisitorChatStore } from "@/types/visitor-chat-store"; // adjust if moved to /store
@@ -20,10 +20,17 @@ export default function VisitorChatRoom() {
     messages,
     isConnected,
     isTyping,
+    pendingMessages,
+    otherPartyOnline,
     addMessage,
     setConnectionStatus,
     setConversationStatus,
     setTyping,
+    updateMessageStatus,
+    replaceMessageId,
+    addPendingMessage,
+    clearPendingMessages,
+    setOtherPartyOnline,
     clearChat,
   } = useVisitorChatStore();
 
@@ -35,6 +42,11 @@ export default function VisitorChatRoom() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
+
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // 2. Main Logic: runs only after mounted (so localStorage is read safely)
   useEffect(() => {
@@ -58,30 +70,56 @@ export default function VisitorChatRoom() {
     setSocket(socketInstance);
 
     socketInstance.on("connect", () => {
-      console.log("Connected to chat server!");
       setConnectionStatus(true);
+
+      // Request presence from other party by emitting our own presence
+      // (The backend sends this when visitor joins, but we can also trigger markAsRead)
+      if (document.hasFocus()) {
+        messagesRef.current.forEach((m) => {
+          if (m.senderType === "AGENT" && m.status !== "READ") {
+            socketInstance.emit("markAsRead", {
+              conversationId,
+              messageId: m.id,
+            });
+          }
+        });
+      }
     });
 
     socketInstance.on("disconnect", () => {
-      console.log("Disconnected from chat server");
       setConnectionStatus(false);
+      setOtherPartyOnline(false);
     });
 
     socketInstance.on(
       "newMessage",
       (payload: {
+        id?: string;
         conversationId: string;
         message: string;
         senderType: "VISITOR" | "AGENT";
+        createdAt?: string;
       }) => {
         if (payload.conversationId === conversationId) {
           addMessage({
-            id: uuidv4(),
+            id: payload.id || uuidv4(),
             conversationId: payload.conversationId,
             content: payload.message,
             senderType: payload.senderType,
-            createdAt: new Date().toISOString(),
+            createdAt: payload.createdAt || new Date().toISOString(),
           });
+
+          // Automatically mark the incoming message as read if the window is focused
+          if (
+            document.hasFocus() &&
+            payload.senderType === "AGENT" &&
+            payload.id
+          ) {
+            socketInstance.emit("markAsRead", {
+              conversationId,
+              messageId: payload.id,
+            });
+          }
         }
       },
     );
@@ -102,8 +140,50 @@ export default function VisitorChatRoom() {
       }
     });
 
+    socketInstance.on(
+      "participantPresence",
+      (payload: { online: boolean; senderType?: string }) => {
+        // If we are a visitor, we care if the agent is online
+        if (payload.senderType === "AGENT" || payload.online === false) {
+          setOtherPartyOnline(payload.online);
+        }
+      },
+    );
+
+    socketInstance.on(
+      "messageStatus",
+      (payload: { messageId: string; status: string }) => {
+        updateMessageStatus(payload.messageId, payload.status);
+      },
+    );
+
+    // When the server confirms our message was saved, swap the fake localId with the real DB id
+    socketInstance.on(
+      "messageSaved",
+      (payload: { localId?: string; id: string; status?: string }) => {
+        if (payload.localId) {
+          replaceMessageId(payload.localId, payload.id, payload.status);
+        }
+      },
+    );
+
+    const handleFocus = () => {
+      if (!socketInstance.connected) return;
+      messagesRef.current.forEach((m) => {
+        if (m.senderType === "AGENT" && m.status !== "READ") {
+          socketInstance.emit("markAsRead", {
+            conversationId,
+            messageId: m.id,
+          });
+        }
+      });
+    };
+
+    window.addEventListener("focus", handleFocus);
+
     // Cleanup on unmount
     return () => {
+      window.removeEventListener("focus", handleFocus);
       socketInstance.disconnect();
     };
   }, [
@@ -116,27 +196,56 @@ export default function VisitorChatRoom() {
     addMessage,
     setTyping,
     setConversationStatus,
+    setOtherPartyOnline,
+    updateMessageStatus,
+    replaceMessageId,
+  ]);
+
+  // Process offline queue on reconnect
+  useEffect(() => {
+    if (isConnected && socket && pendingMessages.length > 0) {
+      pendingMessages.forEach((text) => {
+        socket.emit("sendMessage", {
+          conversationId,
+          message: text,
+          senderType: "VISITOR",
+        });
+      });
+      clearPendingMessages();
+    }
+  }, [
+    isConnected,
+    socket,
+    pendingMessages,
+    conversationId,
+    clearPendingMessages,
   ]);
 
   // 3. Handle sending a message FROM the widget TO the server
   const handleSendMessage = (text: string) => {
-    if (!socket || !isConnected) return;
-
     // Immediately add it to our local state so the UI feels instant
+    const localId = uuidv4();
     const newLocalMessage = {
-      id: uuidv4(),
+      id: localId,
       conversationId,
       content: text,
       senderType: "VISITOR" as const,
       createdAt: new Date().toISOString(),
+      status: "SENT",
     };
     addMessage(newLocalMessage);
 
-    // Emit the event to the server
+    if (!socket || !isConnected) {
+      addPendingMessage(text);
+      return;
+    }
+
+    // Emit the event to the server — include localId so we can reconcile when server responds
     socket.emit("sendMessage", {
       conversationId,
       message: text,
       senderType: "VISITOR",
+      localId,
     });
   };
 
@@ -157,11 +266,23 @@ export default function VisitorChatRoom() {
     <div className="h-screen w-screen bg-slate-100 flex items-center justify-center p-4">
       {/* Container to restrict the widget's max width/height to look like a desktop floating widget, 
           but fills the screen on mobile */}
-      <div className="w-full max-w-md h-full max-h-[700px] sm:h-[80vh]">
+      <div className="w-full max-w-md h-full max-h-[700px] sm:h-[80vh] flex flex-col bg-slate-50 dark:bg-slate-900 border rounded-2xl shadow-xl overflow-hidden">
+        {/* Header */}
+        <div className="bg-white dark:bg-slate-950 px-5 py-4 border-b flex justify-between items-center shadow-sm z-10">
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
+              Chat Support
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+              We usually reply in a few minutes
+            </p>
+          </div>
+        </div>
         <ChatWidget
           messages={messages}
           isConnected={isConnected}
           isTyping={isTyping}
+          otherPartyOnline={otherPartyOnline}
           isClosed={isClosed}
           currentUserType="VISITOR"
           onSendMessage={handleSendMessage}

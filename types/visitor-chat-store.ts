@@ -7,6 +7,8 @@ interface VisitorChatState {
   messages: ChatMessage[];
   isConnected: boolean;
   isTyping: boolean;
+  pendingMessages: string[];
+  otherPartyOnline: boolean;
 
   setConversation: (
     conversation: Conversation,
@@ -17,6 +19,11 @@ interface VisitorChatState {
   setConnectionStatus: (status: boolean) => void;
   setConversationStatus: (status: "OPEN" | "CLOSED") => void;
   setTyping: (status: boolean) => void;
+  updateMessageStatus: (messageId: string, status: string) => void;
+  replaceMessageId: (localId: string, realId: string, status?: string) => void;
+  addPendingMessage: (message: string) => void;
+  clearPendingMessages: () => void;
+  setOtherPartyOnline: (online: boolean) => void;
   clearChat: () => void;
 }
 
@@ -27,6 +34,8 @@ export const useVisitorChatStore = create<VisitorChatState>()(
       messages: [],
       isConnected: false,
       isTyping: false,
+      pendingMessages: [],
+      otherPartyOnline: false,
 
       setConversation: (conversation, firstMessage) =>
         set({
@@ -50,6 +59,31 @@ export const useVisitorChatStore = create<VisitorChatState>()(
 
       setTyping: (status) => set({ isTyping: status }),
 
+      updateMessageStatus: (messageId, status) =>
+        set((state) => ({
+          messages: state.messages.map((m) =>
+            m.id === messageId ? { ...m, status } : m,
+          ),
+        })),
+
+      replaceMessageId: (localId, realId, status) =>
+        set((state) => ({
+          messages: state.messages.map((m) =>
+            m.id === localId
+              ? { ...m, id: realId, status: status ?? m.status }
+              : m,
+          ),
+        })),
+
+      addPendingMessage: (message) =>
+        set((state) => ({
+          pendingMessages: [...state.pendingMessages, message],
+        })),
+
+      clearPendingMessages: () => set({ pendingMessages: [] }),
+
+      setOtherPartyOnline: (online) => set({ otherPartyOnline: online }),
+
       clearChat: () =>
         set({ currentConversation: null, messages: [], isConnected: false }),
     }),
@@ -58,6 +92,7 @@ export const useVisitorChatStore = create<VisitorChatState>()(
       partialize: (state) => ({
         currentConversation: state.currentConversation,
         messages: state.messages,
+        pendingMessages: state.pendingMessages,
       }),
     },
   ),

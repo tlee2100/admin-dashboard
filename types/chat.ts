@@ -6,6 +6,7 @@ export interface ChatMessage {
   senderType: SenderType;
   content: string;
   createdAt: string;
+  status?: string;
 }
 
 export interface Conversation {

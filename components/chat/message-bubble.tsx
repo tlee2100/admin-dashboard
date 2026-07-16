@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { ChatMessage } from "@/types/chat";
-import { User, Headset } from "lucide-react";
+import { User, Headset, Check, CheckCheck } from "lucide-react";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -55,6 +55,18 @@ export function MessageBubble({ message, isCurrentUser }: MessageBubbleProps) {
               hour: "2-digit",
               minute: "2-digit",
             })}
+
+            {isCurrentUser && (
+              <span className="ml-1 inline-flex items-center">
+                {message.status === "READ" ? (
+                  <CheckCheck className="w-3 h-3 text-blue-500" />
+                ) : message.status === "DELIVERED" ? (
+                  <CheckCheck className="w-3 h-3 text-slate-400" />
+                ) : (
+                  <Check className="w-3 h-3 text-slate-400" />
+                )}
+              </span>
+            )}
           </span>
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { io, Socket } from "socket.io-client";
@@ -19,12 +19,31 @@ export default function AgentChatRoom() {
   const {
     messagesByConversation,
     typingStatuses,
+    pendingMessages: allPendingMessages,
+    otherPartyOnline: allOtherPartyOnline,
     addMessage,
     setMessages,
     setTyping,
+    addPendingMessage,
+    clearPendingMessages,
+    setOtherPartyOnline,
+    updateMessageStatus,
   } = useAgentChatStore();
-  const messages = messagesByConversation[conversationId] || [];
+  const messages = useMemo(
+    () => messagesByConversation[conversationId] || [],
+    [messagesByConversation, conversationId],
+  );
   const isTyping = typingStatuses[conversationId] || false;
+  const pendingQueue = useMemo(
+    () => allPendingMessages[conversationId] || [],
+    [allPendingMessages, conversationId],
+  );
+  const otherPartyOnline = allOtherPartyOnline[conversationId] || false;
+
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Fetch conversation history and status
   useEffect(() => {
@@ -54,55 +73,87 @@ export default function AgentChatRoom() {
             },
           },
         );
+
         if (res.ok) {
           const data = await res.json();
           setMessages(conversationId, data);
+        } else {
+          console.error("Failed to load chat data", res.status);
         }
-      } catch (error) {
-        console.error("Failed to fetch conversation data", error);
+      } catch (err) {
+        console.error(err);
       }
     };
 
     fetchHistoryAndStatus();
-  }, [conversationId, session?.accessToken, setMessages]);
 
-  useEffect(() => {
-    if (!session?.accessToken) return;
-
-    // Agent connects with their JWT token
+    // Setup Socket
     const socketInstance = io(
       process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000",
       {
-        auth: { token: session.accessToken },
+        query: {
+          conversationId,
+        },
+        auth: {
+          token: session?.accessToken,
+        },
       },
     );
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSocket(socketInstance);
-
     socketInstance.on("connect", () => {
+      setSocket(socketInstance);
       setIsConnected(true);
-      // Join the specific conversation room on the server
+
+      // Request presence from other party by emitting our own presence
       socketInstance.emit("joinConversation", { conversationId });
+
+      // Mark unread messages as READ if window is focused
+      if (document.hasFocus()) {
+        messagesRef.current.forEach((m) => {
+          if (m.senderType === "VISITOR" && m.status !== "READ") {
+            socketInstance.emit("markAsRead", {
+              conversationId,
+              messageId: m.id,
+            });
+          }
+        });
+      }
     });
 
-    socketInstance.on("disconnect", () => setIsConnected(false));
+    socketInstance.on("disconnect", () => {
+      setIsConnected(false);
+      setOtherPartyOnline(conversationId, false);
+    });
 
     socketInstance.on(
       "newMessage",
       (payload: {
+        id: string;
         conversationId: string;
         message: string;
         senderType: "VISITOR" | "AGENT";
+        createdAt: string;
       }) => {
         if (payload.conversationId === conversationId) {
           addMessage(conversationId, {
-            id: uuidv4(),
+            id: payload.id || uuidv4(),
             conversationId: payload.conversationId,
             content: payload.message,
             senderType: payload.senderType,
-            createdAt: new Date().toISOString(),
+            createdAt: payload.createdAt || new Date().toISOString(),
           });
+
+          // Automatically mark the incoming message as read if the window is focused
+          if (
+            document.hasFocus() &&
+            payload.senderType === "VISITOR" &&
+            payload.id
+          ) {
+            socketInstance.emit("markAsRead", {
+              conversationId,
+              messageId: payload.id,
+            });
+          }
         }
       },
     );
@@ -127,14 +178,67 @@ export default function AgentChatRoom() {
       }
     });
 
+    socketInstance.on(
+      "participantPresence",
+      (payload: { online: boolean; senderType?: string }) => {
+        // If we are an agent, we care if the visitor is online or another agent
+        if (payload.senderType === "VISITOR" || payload.online === false) {
+          setOtherPartyOnline(conversationId, payload.online);
+        }
+      },
+    );
+
+    socketInstance.on(
+      "messageStatus",
+      (payload: { messageId: string; status: string }) => {
+        updateMessageStatus(conversationId, payload.messageId, payload.status);
+      },
+    );
+
+    const handleFocus = () => {
+      if (!socketInstance.connected) return;
+      messagesRef.current.forEach((m) => {
+        if (m.senderType === "VISITOR" && m.status !== "READ") {
+          socketInstance.emit("markAsRead", {
+            conversationId,
+            messageId: m.id,
+          });
+        }
+      });
+    };
+
+    window.addEventListener("focus", handleFocus);
+
     return () => {
+      window.removeEventListener("focus", handleFocus);
       socketInstance.disconnect();
     };
-  }, [session?.accessToken, conversationId, addMessage, setTyping, router]);
+  }, [
+    session?.accessToken,
+    conversationId,
+    addMessage,
+    setTyping,
+    setOtherPartyOnline,
+    updateMessageStatus,
+    router,
+    setMessages,
+  ]);
+
+  // Process offline queue on reconnect
+  useEffect(() => {
+    if (isConnected && socket && pendingQueue.length > 0) {
+      pendingQueue.forEach((text) => {
+        socket.emit("sendMessage", {
+          conversationId,
+          message: text,
+          senderType: "AGENT",
+        });
+      });
+      clearPendingMessages(conversationId);
+    }
+  }, [isConnected, socket, pendingQueue, conversationId, clearPendingMessages]);
 
   const handleSendMessage = (text: string) => {
-    if (!socket || !isConnected) return;
-
     // Add to local state immediately for instant feedback
     addMessage(conversationId, {
       id: uuidv4(),
@@ -142,7 +246,13 @@ export default function AgentChatRoom() {
       content: text,
       senderType: "AGENT",
       createdAt: new Date().toISOString(),
+      status: "SENT",
     });
+
+    if (!socket || !isConnected) {
+      addPendingMessage(conversationId, text);
+      return;
+    }
 
     // Emit to server
     socket.emit("sendMessage", {
@@ -195,6 +305,7 @@ export default function AgentChatRoom() {
         isConnected={isConnected}
         isTyping={isTyping}
         isClosed={isClosed}
+        otherPartyOnline={otherPartyOnline}
         currentUserType="AGENT"
         onSendMessage={handleSendMessage}
         onTyping={handleTyping}

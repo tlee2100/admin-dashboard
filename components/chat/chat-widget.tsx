@@ -18,6 +18,7 @@ interface ChatWidgetProps {
   onDeleteChat?: () => void; // Used by agent
   onTyping?: (isTyping: boolean) => void;
   isClosed?: boolean;
+  otherPartyOnline?: boolean;
 }
 
 export function ChatWidget({
@@ -31,6 +32,7 @@ export function ChatWidget({
   onDeleteChat,
   onTyping,
   isClosed,
+  otherPartyOnline,
 }: ChatWidgetProps) {
   const [inputValue, setInputValue] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -77,8 +79,29 @@ export function ChatWidget({
           ) : (
             <WifiOff className="w-4 h-4 text-red-500" />
           )}
-          <span className="font-semibold text-slate-800 dark:text-slate-100">
+          <span className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             {isConnected ? "Connected" : "Reconnecting..."}
+            {otherPartyOnline !== undefined && (
+              <span
+                className="flex h-2 w-2 relative ml-1"
+                title={
+                  otherPartyOnline
+                    ? "Other party is online"
+                    : "Other party is offline"
+                }
+              >
+                <span
+                  className={`absolute inline-flex h-2 w-2 animate-ping rounded-full opacity-75 ${
+                    otherPartyOnline ? "bg-green-400" : "bg-gray-400"
+                  }`}
+                ></span>
+                <span
+                  className={`relative inline-flex h-2 w-2 rounded-full ${
+                    otherPartyOnline ? "bg-green-500" : "bg-gray-500"
+                  }`}
+                ></span>
+              </span>
+            )}
           </span>
         </div>
 

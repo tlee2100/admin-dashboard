@@ -1,5 +1,6 @@
 "use client";
 import { Bell } from "lucide-react";
+import Link from "next/link";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -39,17 +40,31 @@ export function NotificationBell() {
               No notifications yet
             </div>
           ) : (
-            notifications.map((n) => (
-              <DropdownMenuItem
-                key={n.id}
-                className="flex-col items-start gap-0.5"
-              >
-                <span className="text-sm font-medium">{n.title}</span>
-                <span className="text-xs text-muted-foreground">
-                  {n.message}
-                </span>
-              </DropdownMenuItem>
-            ))
+            notifications.map((n) => {
+              const item = (
+                <DropdownMenuItem
+                  key={n.id}
+                  className="flex-col items-start gap-0.5 cursor-pointer"
+                >
+                  <span className="text-sm font-medium">{n.title}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {n.message}
+                  </span>
+                </DropdownMenuItem>
+              );
+
+              return n.metadata?.conversationId ? (
+                <Link
+                  key={n.id}
+                  href={`/dashboard/chats/${n.metadata.conversationId}`}
+                  className="block"
+                >
+                  {item}
+                </Link>
+              ) : (
+                item
+              );
+            })
           )}
         </DropdownMenuGroup>
       </DropdownMenuContent>
