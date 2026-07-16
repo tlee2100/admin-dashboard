@@ -16,10 +16,15 @@ interface VisitorChatState {
   ) => void;
   addMessage: (message: ChatMessage) => void;
   setMessages: (messages: ChatMessage[]) => void;
+  prependMessages: (messages: ChatMessage[]) => void;
   setConnectionStatus: (status: boolean) => void;
-  setConversationStatus: (status: "OPEN" | "CLOSED") => void;
+  setConversationStatus: (status: "OPEN" | "PAUSED" | "CLOSED") => void;
   setTyping: (status: boolean) => void;
   updateMessageStatus: (messageId: string, status: string) => void;
+  updateMessageReactions: (
+    messageId: string,
+    reactions: Record<string, string[]>,
+  ) => void;
   replaceMessageId: (localId: string, realId: string, status?: string) => void;
   addPendingMessage: (message: string) => void;
   clearPendingMessages: () => void;
@@ -48,6 +53,9 @@ export const useVisitorChatStore = create<VisitorChatState>()(
 
       setMessages: (messages) => set({ messages }),
 
+      prependMessages: (messages) =>
+        set((state) => ({ messages: [...messages, ...state.messages] })),
+
       setConnectionStatus: (status) => set({ isConnected: status }),
 
       setConversationStatus: (status) =>
@@ -63,6 +71,13 @@ export const useVisitorChatStore = create<VisitorChatState>()(
         set((state) => ({
           messages: state.messages.map((m) =>
             m.id === messageId ? { ...m, status } : m,
+          ),
+        })),
+
+      updateMessageReactions: (messageId, reactions) =>
+        set((state) => ({
+          messages: state.messages.map((m) =>
+            m.id === messageId ? { ...m, reactions } : m,
           ),
         })),
 

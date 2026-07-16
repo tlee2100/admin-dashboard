@@ -11,11 +11,17 @@ interface AgentChatState {
 
   addMessage: (conversationId: string, message: ChatMessage) => void;
   setMessages: (conversationId: string, messages: ChatMessage[]) => void;
+  prependMessages: (conversationId: string, messages: ChatMessage[]) => void;
   setTyping: (conversationId: string, isTyping: boolean) => void;
   updateMessageStatus: (
     conversationId: string,
     messageId: string,
     status: string,
+  ) => void;
+  updateMessageReactions: (
+    conversationId: string,
+    messageId: string,
+    reactions: Record<string, string[]>,
   ) => void;
   addPendingMessage: (conversationId: string, message: string) => void;
   clearPendingMessages: (conversationId: string) => void;
@@ -53,6 +59,18 @@ export const useAgentChatStore = create<AgentChatState>()(
           },
         })),
 
+      prependMessages: (conversationId, messages) =>
+        set((state) => {
+          const existingMessages =
+            state.messagesByConversation[conversationId] || [];
+          return {
+            messagesByConversation: {
+              ...state.messagesByConversation,
+              [conversationId]: [...messages, ...existingMessages],
+            },
+          };
+        }),
+
       setTyping: (conversationId, isTyping) =>
         set((state) => ({
           typingStatuses: {
@@ -69,6 +87,19 @@ export const useAgentChatStore = create<AgentChatState>()(
               ...state.messagesByConversation,
               [conversationId]: messages.map((m) =>
                 m.id === messageId ? { ...m, status } : m,
+              ),
+            },
+          };
+        }),
+
+      updateMessageReactions: (conversationId, messageId, reactions) =>
+        set((state) => {
+          const messages = state.messagesByConversation[conversationId] || [];
+          return {
+            messagesByConversation: {
+              ...state.messagesByConversation,
+              [conversationId]: messages.map((m) =>
+                m.id === messageId ? { ...m, reactions } : m,
               ),
             },
           };

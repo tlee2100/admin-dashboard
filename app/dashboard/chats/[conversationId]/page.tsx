@@ -16,6 +16,7 @@ export default function AgentChatRoom() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isClosed, setIsClosed] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const {
     messagesByConversation,
     typingStatuses,
@@ -23,11 +24,13 @@ export default function AgentChatRoom() {
     otherPartyOnline: allOtherPartyOnline,
     addMessage,
     setMessages,
+    prependMessages,
     setTyping,
     addPendingMessage,
     clearPendingMessages,
     setOtherPartyOnline,
     updateMessageStatus,
+    updateMessageReactions,
   } = useAgentChatStore();
   const messages = useMemo(
     () => messagesByConversation[conversationId] || [],
@@ -62,6 +65,7 @@ export default function AgentChatRoom() {
         if (infoRes.ok) {
           const info = await infoRes.json();
           setIsClosed(info.status === "CLOSED");
+          setIsPaused(info.status === "PAUSED");
         }
 
         // Fetch messages
@@ -133,6 +137,10 @@ export default function AgentChatRoom() {
         message: string;
         senderType: "VISITOR" | "AGENT";
         createdAt: string;
+        fileUrl?: string;
+        fileName?: string;
+        fileType?: string;
+        reactions?: Record<string, string[]>;
       }) => {
         if (payload.conversationId === conversationId) {
           addMessage(conversationId, {
@@ -141,6 +149,10 @@ export default function AgentChatRoom() {
             content: payload.message,
             senderType: payload.senderType,
             createdAt: payload.createdAt || new Date().toISOString(),
+            fileUrl: payload.fileUrl,
+            fileName: payload.fileName,
+            fileType: payload.fileType,
+            reactions: payload.reactions,
           });
 
           // Automatically mark the incoming message as read if the window is focused
@@ -178,6 +190,29 @@ export default function AgentChatRoom() {
       }
     });
 
+    socketInstance.on("conversationPaused", (payload: { id: string }) => {
+      if (payload.id === conversationId) {
+        setIsPaused(true);
+      }
+    });
+
+    socketInstance.on("conversationResumed", (payload: { id: string }) => {
+      if (payload.id === conversationId) {
+        setIsPaused(false);
+      }
+    });
+
+    socketInstance.on(
+      "messageReactionUpdated",
+      (payload: { messageId: string; reactions: Record<string, string[]> }) => {
+        updateMessageReactions(
+          conversationId,
+          payload.messageId,
+          payload.reactions,
+        );
+      },
+    );
+
     socketInstance.on(
       "participantPresence",
       (payload: { online: boolean; senderType?: string }) => {
@@ -187,6 +222,13 @@ export default function AgentChatRoom() {
         }
       },
     );
+
+    socketInstance.on("presenceRequested", () => {
+      socketInstance.emit("announcePresence", {
+        conversationId,
+        senderType: "AGENT",
+      });
+    });
 
     socketInstance.on(
       "messageStatus",
@@ -220,6 +262,7 @@ export default function AgentChatRoom() {
     setTyping,
     setOtherPartyOnline,
     updateMessageStatus,
+    updateMessageReactions,
     router,
     setMessages,
   ]);
@@ -228,29 +271,52 @@ export default function AgentChatRoom() {
   useEffect(() => {
     if (isConnected && socket && pendingQueue.length > 0) {
       pendingQueue.forEach((text) => {
-        socket.emit("sendMessage", {
-          conversationId,
-          message: text,
-          senderType: "AGENT",
-        });
+        try {
+          const parsed = JSON.parse(text);
+          socket.emit("sendMessage", {
+            conversationId,
+            message: parsed.content || "",
+            fileUrl: parsed.fileUrl,
+            fileName: parsed.fileName,
+            fileType: parsed.fileType,
+            senderType: "AGENT",
+          });
+        } catch (e) {
+          socket.emit("sendMessage", {
+            conversationId,
+            message: text,
+            senderType: "AGENT",
+          });
+        }
       });
       clearPendingMessages(conversationId);
     }
   }, [isConnected, socket, pendingQueue, conversationId, clearPendingMessages]);
 
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = (
+    text: string,
+    fileUrl?: string,
+    fileName?: string,
+    fileType?: string,
+  ) => {
     // Add to local state immediately for instant feedback
     addMessage(conversationId, {
       id: uuidv4(),
       conversationId,
       content: text,
+      fileUrl,
+      fileName,
+      fileType,
       senderType: "AGENT",
       createdAt: new Date().toISOString(),
       status: "SENT",
     });
 
     if (!socket || !isConnected) {
-      addPendingMessage(conversationId, text);
+      addPendingMessage(
+        conversationId,
+        JSON.stringify({ content: text, fileUrl, fileName, fileType }),
+      );
       return;
     }
 
@@ -258,8 +324,58 @@ export default function AgentChatRoom() {
     socket.emit("sendMessage", {
       conversationId,
       message: text,
+      fileUrl,
+      fileName,
+      fileType,
       senderType: "AGENT",
     });
+  };
+
+  const handleReactMessage = (messageId: string, emoji: string) => {
+    if (!socket || !isConnected) return;
+    socket.emit("reactMessage", {
+      conversationId,
+      messageId,
+      emoji,
+      userId: session?.user?.id || "agent",
+    });
+  };
+
+  const handlePauseChat = () => {
+    if (!socket || !isConnected) return;
+    if (isPaused) {
+      socket.emit("sendMessage", {
+        conversationId,
+        message: "Chat resumed by agent",
+        senderType: "AGENT",
+        localId: uuidv4(),
+      });
+    } else {
+      socket.emit("pauseConversation", { conversationId });
+    }
+  };
+
+  const handleLoadMore = async () => {
+    if (!session?.accessToken || messages.length === 0) return;
+    try {
+      const oldestMessage = messages[0];
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/chat/conversations/${conversationId}/messages?cursor=${oldestMessage.createdAt}&limit=50`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.accessToken}`,
+          },
+        },
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.length > 0) {
+          prependMessages(conversationId, data);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load more history", e);
+    }
   };
 
   const handleTyping = (typing: boolean) => {
@@ -305,9 +421,13 @@ export default function AgentChatRoom() {
         isConnected={isConnected}
         isTyping={isTyping}
         isClosed={isClosed}
+        isPaused={isPaused}
         otherPartyOnline={otherPartyOnline}
         currentUserType="AGENT"
         onSendMessage={handleSendMessage}
+        onReactMessage={handleReactMessage}
+        onPauseChat={handlePauseChat}
+        onLoadMore={handleLoadMore}
         onTyping={handleTyping}
         onEndChat={handleEndChat}
         onCloseChat={handleCloseWindow}

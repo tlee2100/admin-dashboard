@@ -7,12 +7,16 @@ export interface ChatMessage {
   content: string;
   createdAt: string;
   status?: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileType?: string;
+  reactions?: Record<string, string[]>;
 }
 
 export interface Conversation {
   id: string;
   siteId: number;
-  status: "OPEN" | "CLOSED";
+  status: "OPEN" | "PAUSED" | "CLOSED";
   visitorName: string;
   visitorEmail: string;
 }

@@ -27,6 +27,7 @@ export default function VisitorChatRoom() {
     setConversationStatus,
     setTyping,
     updateMessageStatus,
+    updateMessageReactions,
     replaceMessageId,
     addPendingMessage,
     clearPendingMessages,
@@ -35,6 +36,7 @@ export default function VisitorChatRoom() {
   } = useVisitorChatStore();
 
   const isClosed = currentConversation?.status === "CLOSED";
+  const isPaused = currentConversation?.status === "PAUSED";
   const [mounted, setMounted] = useState(false);
 
   // 1. Handle Hydration
@@ -99,6 +101,10 @@ export default function VisitorChatRoom() {
         message: string;
         senderType: "VISITOR" | "AGENT";
         createdAt?: string;
+        fileUrl?: string;
+        fileName?: string;
+        fileType?: string;
+        reactions?: Record<string, string[]>;
       }) => {
         if (payload.conversationId === conversationId) {
           addMessage({
@@ -107,6 +113,10 @@ export default function VisitorChatRoom() {
             content: payload.message,
             senderType: payload.senderType,
             createdAt: payload.createdAt || new Date().toISOString(),
+            fileUrl: payload.fileUrl,
+            fileName: payload.fileName,
+            fileType: payload.fileType,
+            reactions: payload.reactions,
           });
 
           // Automatically mark the incoming message as read if the window is focused
@@ -140,6 +150,25 @@ export default function VisitorChatRoom() {
       }
     });
 
+    socketInstance.on("conversationPaused", (payload: { id: string }) => {
+      if (payload.id === conversationId) {
+        setConversationStatus("PAUSED");
+      }
+    });
+
+    socketInstance.on("conversationResumed", (payload: { id: string }) => {
+      if (payload.id === conversationId) {
+        setConversationStatus("OPEN");
+      }
+    });
+
+    socketInstance.on(
+      "messageReactionUpdated",
+      (payload: { messageId: string; reactions: Record<string, string[]> }) => {
+        updateMessageReactions(payload.messageId, payload.reactions);
+      },
+    );
+
     socketInstance.on(
       "participantPresence",
       (payload: { online: boolean; senderType?: string }) => {
@@ -149,6 +178,13 @@ export default function VisitorChatRoom() {
         }
       },
     );
+
+    socketInstance.on("presenceRequested", () => {
+      socketInstance.emit("announcePresence", {
+        conversationId,
+        senderType: "VISITOR",
+      });
+    });
 
     socketInstance.on(
       "messageStatus",
@@ -160,7 +196,15 @@ export default function VisitorChatRoom() {
     // When the server confirms our message was saved, swap the fake localId with the real DB id
     socketInstance.on(
       "messageSaved",
-      (payload: { localId?: string; id: string; status?: string }) => {
+      (payload: {
+        localId?: string;
+        id: string;
+        status?: string;
+        fileUrl?: string;
+        fileName?: string;
+        fileType?: string;
+        reactions?: Record<string, string[]>;
+      }) => {
         if (payload.localId) {
           replaceMessageId(payload.localId, payload.id, payload.status);
         }
@@ -198,6 +242,7 @@ export default function VisitorChatRoom() {
     setConversationStatus,
     setOtherPartyOnline,
     updateMessageStatus,
+    updateMessageReactions,
     replaceMessageId,
   ]);
 
@@ -205,11 +250,23 @@ export default function VisitorChatRoom() {
   useEffect(() => {
     if (isConnected && socket && pendingMessages.length > 0) {
       pendingMessages.forEach((text) => {
-        socket.emit("sendMessage", {
-          conversationId,
-          message: text,
-          senderType: "VISITOR",
-        });
+        try {
+          const parsed = JSON.parse(text);
+          socket.emit("sendMessage", {
+            conversationId,
+            message: parsed.content || "",
+            fileUrl: parsed.fileUrl,
+            fileName: parsed.fileName,
+            fileType: parsed.fileType,
+            senderType: "VISITOR",
+          });
+        } catch (e) {
+          socket.emit("sendMessage", {
+            conversationId,
+            message: text,
+            senderType: "VISITOR",
+          });
+        }
       });
       clearPendingMessages();
     }
@@ -222,13 +279,21 @@ export default function VisitorChatRoom() {
   ]);
 
   // 3. Handle sending a message FROM the widget TO the server
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = (
+    text: string,
+    fileUrl?: string,
+    fileName?: string,
+    fileType?: string,
+  ) => {
     // Immediately add it to our local state so the UI feels instant
     const localId = uuidv4();
     const newLocalMessage = {
       id: localId,
       conversationId,
       content: text,
+      fileUrl,
+      fileName,
+      fileType,
       senderType: "VISITOR" as const,
       createdAt: new Date().toISOString(),
       status: "SENT",
@@ -236,7 +301,9 @@ export default function VisitorChatRoom() {
     addMessage(newLocalMessage);
 
     if (!socket || !isConnected) {
-      addPendingMessage(text);
+      addPendingMessage(
+        JSON.stringify({ content: text, fileUrl, fileName, fileType }),
+      );
       return;
     }
 
@@ -244,9 +311,36 @@ export default function VisitorChatRoom() {
     socket.emit("sendMessage", {
       conversationId,
       message: text,
+      fileUrl,
+      fileName,
+      fileType,
       senderType: "VISITOR",
       localId,
     });
+  };
+
+  const handleReactMessage = (messageId: string, emoji: string) => {
+    if (!socket || !isConnected) return;
+    socket.emit("reactMessage", {
+      conversationId,
+      messageId,
+      emoji,
+      userId: "visitor",
+    });
+  };
+
+  const handlePauseChat = () => {
+    if (!socket || !isConnected) return;
+    if (isPaused) {
+      socket.emit("sendMessage", {
+        conversationId,
+        message: "Chat resumed",
+        senderType: "VISITOR",
+        localId: uuidv4(),
+      });
+    } else {
+      socket.emit("pauseConversation", { conversationId });
+    }
   };
 
   const handleTyping = (typing: boolean) => {
@@ -284,8 +378,11 @@ export default function VisitorChatRoom() {
           isTyping={isTyping}
           otherPartyOnline={otherPartyOnline}
           isClosed={isClosed}
+          isPaused={isPaused}
           currentUserType="VISITOR"
           onSendMessage={handleSendMessage}
+          onReactMessage={handleReactMessage}
+          onPauseChat={handlePauseChat}
           onTyping={handleTyping}
           onEndChat={handleEndChat}
         />

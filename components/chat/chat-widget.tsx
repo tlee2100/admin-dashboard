@@ -3,21 +3,39 @@
 import { useState, useRef, useEffect } from "react";
 import { ChatMessage } from "@/types/chat";
 import { MessageBubble } from "./message-bubble";
-import { Send, Wifi, WifiOff } from "lucide-react";
+import {
+  Send,
+  Wifi,
+  WifiOff,
+  Pause,
+  Play,
+  Paperclip,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 interface ChatWidgetProps {
   messages: ChatMessage[];
   isConnected: boolean;
   isTyping: boolean;
   currentUserType: "VISITOR" | "AGENT";
-  onSendMessage: (message: string) => void;
+  onSendMessage: (
+    message: string,
+    fileUrl?: string,
+    fileName?: string,
+    fileType?: string,
+  ) => void;
   onEndChat?: () => void; // Used by visitor to end chat
   onCloseChat?: () => void; // Used by agent
   onDeleteChat?: () => void; // Used by agent
+  onPauseChat?: () => void;
+  onReactMessage?: (messageId: string, emoji: string) => void;
+  onLoadMore?: () => void;
   onTyping?: (isTyping: boolean) => void;
   isClosed?: boolean;
+  isPaused?: boolean;
   otherPartyOnline?: boolean;
 }
 
@@ -32,16 +50,81 @@ export function ChatWidget({
   onDeleteChat,
   onTyping,
   isClosed,
+  isPaused,
   otherPartyOnline,
+  onPauseChat,
+  onReactMessage,
+  onLoadMore,
 }: ChatWidgetProps) {
   const [inputValue, setInputValue] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-scroll to bottom whenever messages change
+  // Auto-scroll to bottom whenever messages change (only if near bottom)
   useEffect(() => {
+    // Only scroll if we are not looking at history
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (e.currentTarget.scrollTop < 50 && onLoadMore) {
+      onLoadMore();
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/chat/upload`,
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+
+      onSendMessage(inputValue.trim(), data.url, data.fileName, data.fileType);
+      setInputValue("");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to upload file");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileUpload(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileUpload(e.target.files[0]);
+    }
+  };
 
   const handleSend = () => {
     if (!inputValue.trim()) return;
@@ -105,19 +188,41 @@ export function ChatWidget({
           </span>
         </div>
 
-        {onEndChat && (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={onEndChat}
-            disabled={isClosed}
-          >
-            End Chat
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {onPauseChat && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onPauseChat}
+              disabled={isClosed}
+              className="flex items-center gap-1"
+            >
+              {isPaused ? (
+                <>
+                  <Play className="w-4 h-4" /> Resume
+                </>
+              ) : (
+                <>
+                  <Pause className="w-4 h-4" /> Pause
+                </>
+              )}
+            </Button>
+          )}
+
+          {onEndChat && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={onEndChat}
+              disabled={isClosed}
+            >
+              End Chat
+            </Button>
+          )}
+        </div>
 
         {currentUserType === "AGENT" && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 ml-2">
             {onCloseChat && (
               <Button variant="outline" size="sm" onClick={onCloseChat}>
                 Close Window
@@ -145,12 +250,34 @@ export function ChatWidget({
       </div>
 
       {/* Message List */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div
+        className="flex-1 overflow-y-auto p-4 space-y-4 relative"
+        onScroll={handleScroll}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {isDragging && (
+          <div className="absolute inset-0 z-20 bg-primary/10 border-2 border-dashed border-primary rounded-xl flex items-center justify-center backdrop-blur-sm m-4">
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-lg flex flex-col items-center">
+              <Paperclip className="w-8 h-8 text-primary mb-2" />
+              <p className="font-medium text-primary">Drop file here to send</p>
+            </div>
+          </div>
+        )}
+
+        {isPaused && !isClosed && (
+          <div className="mx-auto w-fit py-1 px-3 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 text-xs font-medium rounded-full mb-4">
+            Chat is paused
+          </div>
+        )}
+
         {messages.map((msg) => (
           <MessageBubble
             key={msg.id}
             message={msg}
             isCurrentUser={msg.senderType === currentUserType}
+            onReact={onReactMessage}
           />
         ))}
 
@@ -174,6 +301,19 @@ export function ChatWidget({
           </div>
         ) : (
           <div className="flex gap-2 items-end bg-slate-50 dark:bg-slate-950 border rounded-xl focus-within:ring-2 focus-within:ring-primary/50 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all p-1">
+            <label className="cursor-pointer p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg shrink-0 mb-0.5 ml-0.5">
+              <input
+                type="file"
+                className="hidden"
+                onChange={handleFileInput}
+                disabled={!isConnected || isUploading}
+              />
+              {isUploading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Paperclip className="w-4 h-4 text-slate-500" />
+              )}
+            </label>
             <Textarea
               value={inputValue}
               onChange={handleInputChange}
@@ -187,7 +327,7 @@ export function ChatWidget({
               size="icon"
               className="rounded-lg mb-1 mr-1 h-9 w-9 shrink-0"
               onClick={handleSend}
-              disabled={!inputValue.trim() || !isConnected}
+              disabled={(!inputValue.trim() && !isUploading) || !isConnected}
             >
               <Send className="w-4 h-4" />
             </Button>
