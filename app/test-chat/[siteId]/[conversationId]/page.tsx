@@ -50,15 +50,19 @@ export default function VisitorChatRoom() {
     messagesRef.current = messages;
   }, [messages]);
 
-  // 2. Main Logic: runs only after mounted (so localStorage is read safely)
+  // 2. Validation: check if conversation exists in local storage
   useEffect(() => {
     if (!mounted) return;
-
-    // If they don't have local storage for this conversation, boot them out
     if (!currentConversation || currentConversation.id !== conversationId) {
       router.push(`/test-chat/${params.siteId}`);
-      return;
     }
+  }, [mounted, currentConversation, conversationId, params.siteId, router]);
+
+  // 3. Main WebSocket Logic
+  useEffect(() => {
+    if (!mounted) return;
+    if (!currentConversation || currentConversation.id !== conversationId)
+      return;
 
     // Initialize WebSocket Connection
     const socketInstance = io(
@@ -230,10 +234,10 @@ export default function VisitorChatRoom() {
       window.removeEventListener("focus", handleFocus);
       socketInstance.disconnect();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     mounted,
     conversationId,
-    currentConversation,
     router,
     params.siteId,
     setConnectionStatus,
