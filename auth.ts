@@ -11,32 +11,47 @@ export class TwoFactorRequiredError extends CredentialsSignin {
 
 const REFRESH_BUFFER_MS = 60 * 1000;
 
+let pendingRefreshPromise: Promise<JWT> | null = null;
+
 async function refreshAccessToken(token: JWT): Promise<JWT> {
-  try {
-    const res = await fetch(`${process.env.API_URL}/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken: token.refreshToken }),
-    });
-
-    if (!res.ok) throw new Error("Refresh failed");
-
-    const data = await res.json();
-
-    return {
-      ...token,
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token, // rotation: luôn nhận refresh token mới
-      accessTokenExpires: Date.now() + data.expires_in * 1000,
-      error: undefined,
-    };
-  } catch {
-    return {
-      ...token,
-      accessToken: undefined,
-      error: "RefreshAccessTokenError",
-    };
+  // If a refresh is already in progress, wait for it instead of making a new request
+  if (pendingRefreshPromise) {
+    return pendingRefreshPromise;
   }
+
+  // Create a new refresh promise
+  pendingRefreshPromise = (async () => {
+    try {
+      const res = await fetch(`${process.env.API_URL}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: token.refreshToken }),
+      });
+
+      if (!res.ok) throw new Error("Refresh failed");
+
+      const data = await res.json();
+
+      return {
+        ...token,
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token, // rotation: luôn nhận refresh token mới
+        accessTokenExpires: Date.now() + data.expires_in * 1000,
+        error: undefined,
+      };
+    } catch {
+      return {
+        ...token,
+        accessToken: undefined,
+        error: "RefreshAccessTokenError",
+      };
+    } finally {
+      // Clear the promise when done so subsequent expirations can trigger a new refresh
+      pendingRefreshPromise = null;
+    }
+  })();
+
+  return pendingRefreshPromise;
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({

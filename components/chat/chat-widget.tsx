@@ -17,6 +17,7 @@ import {
   Play,
   Paperclip,
   Loader2,
+  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,8 +40,10 @@ interface ChatWidgetProps {
   onReactMessage?: (messageId: string, emoji: string) => void;
   onLoadMore?: () => void | Promise<void>;
   onTyping?: (isTyping: boolean) => void;
+  onToggleAi?: (isActive: boolean) => void;
   isClosed?: boolean;
   isPaused?: boolean;
+  isAiActive?: boolean;
   otherPartyOnline?: boolean;
   hasMore?: boolean;
 }
@@ -55,8 +58,10 @@ export function ChatWidget({
   onCloseChat,
   onDeleteChat,
   onTyping,
+  onToggleAi,
   isClosed,
   isPaused,
+  isAiActive,
   otherPartyOnline,
   onPauseChat,
   onReactMessage,
@@ -290,6 +295,18 @@ export function ChatWidget({
 
         {currentUserType === "AGENT" && (
           <div className="flex gap-2 ml-2">
+            {onToggleAi && (
+              <Button
+                variant={isAiActive ? "default" : "outline"}
+                size="sm"
+                onClick={() => onToggleAi(!isAiActive)}
+                className="flex items-center gap-1"
+                title={isAiActive ? "AI Reply is ON" : "AI Reply is OFF"}
+              >
+                <Bot className="w-4 h-4" />
+                {isAiActive ? "AI: ON" : "AI: OFF"}
+              </Button>
+            )}
             {onCloseChat && (
               <Button variant="outline" size="sm" onClick={onCloseChat}>
                 Close Window

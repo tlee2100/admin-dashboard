@@ -419,6 +419,12 @@ export default function VisitorChatRoom() {
     }
   };
 
+  const handleCallAgent = () => {
+    if (!socket || !isConnected) return;
+    socket.emit("callAgent", { conversationId });
+    alert("An agent has been notified and will join shortly.");
+  };
+
   return (
     <div className="h-screen w-screen bg-slate-100 flex items-center justify-center p-4">
       {/* Container to restrict the widget's max width/height to look like a desktop floating widget, 
@@ -434,6 +440,13 @@ export default function VisitorChatRoom() {
               We usually reply in a few minutes
             </p>
           </div>
+          <button
+            onClick={handleCallAgent}
+            disabled={!isConnected}
+            className="text-sm font-medium px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md transition-colors disabled:opacity-50"
+          >
+            Call Agent
+          </button>
         </div>
         <ChatWidget
           messages={messages}

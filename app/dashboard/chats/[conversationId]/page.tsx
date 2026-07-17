@@ -21,6 +21,7 @@ export default function AgentChatRoom() {
   const [isConnected, setIsConnected] = useState(false);
   const [isClosed, setIsClosed] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isAiActive, setIsAiActive] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const {
     messagesByConversation,
@@ -72,6 +73,7 @@ export default function AgentChatRoom() {
           const info = await infoRes.json();
           setIsClosed(info.status === "CLOSED");
           setIsPaused(info.status === "PAUSED");
+          setIsAiActive(info.isAiActive !== false); // default to true
         }
 
         // Fetch messages
@@ -208,6 +210,15 @@ export default function AgentChatRoom() {
         setIsPaused(false);
       }
     });
+
+    socketInstance.on(
+      "aiToggled",
+      (payload: { conversationId: string; isAiActive: boolean }) => {
+        if (payload.conversationId === conversationId) {
+          setIsAiActive(payload.isAiActive);
+        }
+      },
+    );
 
     socketInstance.on(
       "messageReactionUpdated",
@@ -418,6 +429,12 @@ export default function AgentChatRoom() {
     socket.emit("typing", { conversationId, isTyping: typing });
   };
 
+  const handleToggleAi = (active: boolean) => {
+    if (!socket || !isConnected) return;
+    socket.emit("toggleAi", { conversationId, isAiActive: active });
+    setIsAiActive(active);
+  };
+
   const handleEndChat = async () => {
     if (!window.confirm("Are you sure you want to end this conversation?")) {
       return;
@@ -457,6 +474,7 @@ export default function AgentChatRoom() {
         isTyping={isTyping}
         isClosed={isClosed}
         isPaused={isPaused}
+        isAiActive={isAiActive}
         otherPartyOnline={otherPartyOnline}
         currentUserType="AGENT"
         onSendMessage={handleSendMessage}
@@ -465,6 +483,7 @@ export default function AgentChatRoom() {
         onLoadMore={handleLoadMore}
         hasMore={hasMore}
         onTyping={handleTyping}
+        onToggleAi={handleToggleAi}
         onEndChat={handleEndChat}
         onCloseChat={handleCloseWindow}
       />
