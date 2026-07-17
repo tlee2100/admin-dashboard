@@ -21,6 +21,7 @@ export default function AgentChatRoom() {
   const [isConnected, setIsConnected] = useState(false);
   const [isClosed, setIsClosed] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const {
     messagesByConversation,
     typingStatuses,
@@ -86,6 +87,7 @@ export default function AgentChatRoom() {
         if (res.ok) {
           const data = await res.json();
           setMessages(conversationId, data);
+          if (data.length < PAGE_LIMIT) setHasMore(false);
         } else {
           console.error("Failed to load chat data", res.status);
         }
@@ -404,6 +406,7 @@ export default function AgentChatRoom() {
         if (data.length > 0) {
           prependMessages(conversationId, data);
         }
+        if (data.length < PAGE_LIMIT) setHasMore(false);
       }
     } catch (e) {
       console.error("Failed to load more history", e);
@@ -460,6 +463,7 @@ export default function AgentChatRoom() {
         onReactMessage={handleReactMessage}
         onPauseChat={handlePauseChat}
         onLoadMore={handleLoadMore}
+        hasMore={hasMore}
         onTyping={handleTyping}
         onEndChat={handleEndChat}
         onCloseChat={handleCloseWindow}

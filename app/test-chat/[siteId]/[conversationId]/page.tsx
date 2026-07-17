@@ -59,6 +59,33 @@ export default function VisitorChatRoom() {
     }
   }, [mounted, currentConversation, conversationId, params.siteId, router]);
 
+  // Fetch initial messages like agent dashboard
+  useEffect(() => {
+    if (
+      !mounted ||
+      !currentConversation ||
+      currentConversation.id !== conversationId
+    )
+      return;
+
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/chat/conversations/${conversationId}/messages?limit=10`,
+        );
+        if (res.ok) {
+          const data = await res.json();
+          useVisitorChatStore.getState().setMessages(data);
+          if (data.length < 10) setHasMore(false);
+        }
+      } catch (err) {
+        console.error("Failed to fetch initial messages:", err);
+      }
+    };
+
+    fetchHistory();
+  }, [mounted, currentConversation, conversationId]);
+
   // 3. Main WebSocket Logic
   useEffect(() => {
     if (!mounted) return;
@@ -368,19 +395,16 @@ export default function VisitorChatRoom() {
       const data = await res.json();
 
       // If we got fewer than limit, there are no more older messages
-      if (data.data.length < 10) {
+      if (data.length < 10) {
         setHasMore(false);
       }
 
-      if (data.data.length > 0) {
-        // The API returns messages ordered by createdAt DESC (newest first).
-        // Since we are fetching older messages, we want them in chronological order
-        // to prepend them correctly, so we reverse the array.
-        // Wait, if we prepend, we just need to pass the chronological array.
-        const olderMessages = [...data.data].reverse();
-
-        // Update the Zustand store (which syncs to sessionStorage)
-        useVisitorChatStore.getState().prependMessages(olderMessages);
+      if (data.length > 0) {
+        // The API returns messages ordered chronologically if we reversed it in backend?
+        // Wait, the backend already does .reverse(). But earlier we assumed it didn't.
+        // Let's just pass data since the backend returns chronological.
+        // Actually, backend returns them in chronological order. We want to prepend them in chronological order.
+        useVisitorChatStore.getState().prependMessages(data);
       }
     } catch (err) {
       console.error("Failed to load more messages:", err);
@@ -425,6 +449,7 @@ export default function VisitorChatRoom() {
           onTyping={handleTyping}
           onEndChat={handleEndChat}
           onLoadMore={handleLoadMore}
+          hasMore={hasMore}
         />
       </div>
     </div>

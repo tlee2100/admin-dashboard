@@ -42,6 +42,7 @@ interface ChatWidgetProps {
   isClosed?: boolean;
   isPaused?: boolean;
   otherPartyOnline?: boolean;
+  hasMore?: boolean;
 }
 
 export function ChatWidget({
@@ -60,6 +61,7 @@ export function ChatWidget({
   onPauseChat,
   onReactMessage,
   onLoadMore,
+  hasMore,
 }: ChatWidgetProps) {
   const [inputValue, setInputValue] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -85,7 +87,10 @@ export function ChatWidget({
       container.scrollTop =
         container.scrollHeight - prevScrollHeightRef.current;
     }
-    isPrependingRef.current = false;
+    // Delay resetting so the auto-scroll useEffect sees it as true and bails out
+    setTimeout(() => {
+      isPrependingRef.current = false;
+    }, 0);
   }, [messages]);
 
   // Called by parent right BEFORE prepending older messages
@@ -94,8 +99,8 @@ export function ChatWidget({
     prevScrollHeightRef.current = scrollContainerRef.current?.scrollHeight ?? 0;
   }, []);
 
-  const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
-    if (e.currentTarget.scrollTop < 50 && onLoadMore && !isFetchingHistory) {
+  const handleLoadMoreClick = async () => {
+    if (onLoadMore && !isFetchingHistory) {
       setIsFetchingHistory(true);
       prepareForPrepend();
       try {
@@ -315,11 +320,31 @@ export function ChatWidget({
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto p-4 space-y-4 relative"
-        onScroll={handleScroll}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
+        {onLoadMore && hasMore && (
+          <div className="flex justify-center mb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLoadMoreClick}
+              disabled={isFetchingHistory}
+              className="text-xs rounded-full bg-white dark:bg-slate-800 shadow-sm"
+            >
+              {isFetchingHistory ? (
+                <>
+                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                "Load more messages"
+              )}
+            </Button>
+          </div>
+        )}
+
         {isDragging && (
           <div className="absolute inset-0 z-20 bg-primary/10 border-2 border-dashed border-primary rounded-xl flex items-center justify-center backdrop-blur-sm m-4">
             <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-lg flex flex-col items-center">
