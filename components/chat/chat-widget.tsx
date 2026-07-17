@@ -21,8 +21,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useChat } from "@ai-sdk/react";
+import { TextStreamChatTransport } from "ai";
+import { useMemo } from "react";
 
 interface ChatWidgetProps {
+  conversationId?: string; // Used for streaming API
   messages: ChatMessage[];
   isConnected: boolean;
   isTyping: boolean;
@@ -67,6 +71,7 @@ export function ChatWidget({
   onReactMessage,
   onLoadMore,
   hasMore,
+  conversationId,
 }: ChatWidgetProps) {
   const [inputValue, setInputValue] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -77,6 +82,49 @@ export function ChatWidget({
   const isPrependingRef = useRef(false);
   const prevScrollHeightRef = useRef(0);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasTriggeredFirstAi = useRef(false);
+
+  const transport = useMemo(
+    () =>
+      new TextStreamChatTransport({
+        api: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/chat/stream`,
+        body: { conversationId },
+      }),
+    [conversationId],
+  );
+
+  const {
+    messages: aiMessages,
+    sendMessage,
+    status,
+    setMessages: setAiMessages,
+  } = useChat({
+    transport,
+  });
+  const isLoading = status === "submitted" || status === "streaming";
+
+  // Auto-trigger first message stream if it's a new conversation
+  useEffect(() => {
+    if (
+      conversationId &&
+      messages.length === 1 &&
+      messages[0].senderType === "VISITOR" &&
+      isAiActive &&
+      !hasTriggeredFirstAi.current &&
+      currentUserType === "VISITOR" // Only visitor triggers stream
+    ) {
+      hasTriggeredFirstAi.current = true;
+      sendMessage({ text: messages[0].content });
+    }
+  }, [messages, isAiActive, conversationId, currentUserType, sendMessage]);
+
+  // Clear HTTP streaming message when WebSocket delivers the final version
+  useEffect(() => {
+    const lastWsMessage = messages[messages.length - 1];
+    if (lastWsMessage && lastWsMessage.senderType === "AI" && !isLoading) {
+      setAiMessages([]);
+    }
+  }, [messages, isLoading, setAiMessages]);
 
   // Auto-scroll to bottom only for NEW messages (not when prepending history)
   useEffect(() => {
@@ -158,6 +206,18 @@ export function ChatWidget({
         // Only send the text input with the first file
         const textToSend = i === 0 ? inputValue.trim() : "";
         onSendMessage(textToSend, data.url, data.fileName, data.fileType);
+
+        if (
+          i === 0 &&
+          isAiActive &&
+          !isClosed &&
+          currentUserType === "VISITOR"
+        ) {
+          // We do not append files to stream yet, just the text if any
+          if (textToSend) {
+            sendMessage({ text: textToSend });
+          }
+        }
       }
 
       // Clear input after sending all files
@@ -200,7 +260,13 @@ export function ChatWidget({
 
   const handleSend = () => {
     if (!inputValue.trim()) return;
-    onSendMessage(inputValue.trim());
+    const text = inputValue.trim();
+    onSendMessage(text);
+
+    if (isAiActive && !isClosed && currentUserType === "VISITOR") {
+      sendMessage({ text });
+    }
+
     setInputValue("");
     if (onTyping) onTyping(false);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -385,6 +451,45 @@ export function ChatWidget({
             onReact={onReactMessage}
           />
         ))}
+
+        {(() => {
+          const assistantAiMessages = aiMessages.filter(
+            (m) => m.role === "assistant",
+          );
+          const latestAiMessage =
+            assistantAiMessages[assistantAiMessages.length - 1];
+          const latestAiText =
+            latestAiMessage?.parts
+              ?.filter(
+                (p): p is { type: "text"; text: string } => p.type === "text",
+              )
+              .map((p) => p.text)
+              .join("") || "";
+          // Display if there's a streaming message and it's not already covered by WS
+          if (
+            latestAiMessage &&
+            (isLoading ||
+              !messages.find(
+                (m) => m.content === latestAiText && m.senderType === "AI",
+              ))
+          ) {
+            return (
+              <MessageBubble
+                key={`streaming-${latestAiMessage.id}`}
+                message={{
+                  id: `streaming-${latestAiMessage.id}`,
+                  conversationId: conversationId || "",
+                  content: latestAiText,
+                  senderType: "AI",
+                  createdAt: new Date().toISOString(),
+                  status: "SENT",
+                }}
+                isCurrentUser={false}
+              />
+            );
+          }
+          return null;
+        })()}
 
         {isTyping && (
           <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 text-sm italic pl-10">

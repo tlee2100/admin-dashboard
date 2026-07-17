@@ -469,6 +469,7 @@ export default function AgentChatRoom() {
   return (
     <div className="h-[calc(100vh-4rem)] p-4">
       <ChatWidget
+        conversationId={conversationId}
         messages={messages}
         isConnected={isConnected}
         isTyping={isTyping}

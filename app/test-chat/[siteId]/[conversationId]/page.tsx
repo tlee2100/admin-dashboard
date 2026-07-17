@@ -450,6 +450,7 @@ export default function VisitorChatRoom() {
         </div>
         <div className="flex-1 min-h-0 relative">
           <ChatWidget
+            conversationId={conversationId}
             messages={messages}
             currentUserType="VISITOR"
             isConnected={isConnected}
@@ -460,6 +461,7 @@ export default function VisitorChatRoom() {
             onLoadMore={handleLoadMore}
             hasMore={hasMore}
             isClosed={isClosed}
+            isAiActive={currentConversation?.isAiActive ?? true}
             onEndChat={handleEndChat}
             onPauseChat={handlePauseChat}
             isPaused={isPaused}

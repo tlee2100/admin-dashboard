@@ -1,4 +1,4 @@
-export type SenderType = "VISITOR" | "AGENT";
+export type SenderType = "VISITOR" | "AGENT" | "AI";
 
 export interface ChatMessage {
   id: string;
