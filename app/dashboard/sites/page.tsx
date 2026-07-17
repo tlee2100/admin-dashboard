@@ -16,6 +16,7 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
+  MessageSquare,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -365,6 +366,19 @@ export default function SitesListPage() {
                         }}
                       >
                         <Users className="size-3.5" /> Agents
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() =>
+                          window.open(
+                            `http://localhost:3001/test-chat/${site.id}`,
+                            "_blank",
+                          )
+                        }
+                      >
+                        <MessageSquare className="size-3.5" /> Test-Chatting
                       </Button>
                       <CanAccess action="edit" resource="sites" fallback={null}>
                         <Button

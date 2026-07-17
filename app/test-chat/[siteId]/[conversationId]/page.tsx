@@ -431,7 +431,7 @@ export default function VisitorChatRoom() {
           but fills the screen on mobile */}
       <div className="w-full max-w-md h-full max-h-[700px] sm:h-[80vh] flex flex-col bg-slate-50 dark:bg-slate-900 border rounded-2xl shadow-xl overflow-hidden">
         {/* Header */}
-        <div className="bg-white dark:bg-slate-950 px-5 py-4 border-b flex justify-between items-center shadow-sm z-10">
+        <div className="bg-white dark:bg-slate-950 px-5 py-4 border-b flex justify-between items-center shadow-sm z-10 shrink-0">
           <div>
             <h2 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
               Chat Support
@@ -448,22 +448,24 @@ export default function VisitorChatRoom() {
             Call Agent
           </button>
         </div>
-        <ChatWidget
-          messages={messages}
-          isConnected={isConnected}
-          isTyping={isTyping}
-          otherPartyOnline={otherPartyOnline}
-          isClosed={isClosed}
-          isPaused={isPaused}
-          currentUserType="VISITOR"
-          onSendMessage={handleSendMessage}
-          onReactMessage={handleReactMessage}
-          onPauseChat={handlePauseChat}
-          onTyping={handleTyping}
-          onEndChat={handleEndChat}
-          onLoadMore={handleLoadMore}
-          hasMore={hasMore}
-        />
+        <div className="flex-1 min-h-0 relative">
+          <ChatWidget
+            messages={messages}
+            currentUserType="VISITOR"
+            isConnected={isConnected}
+            isTyping={isTyping}
+            onSendMessage={handleSendMessage}
+            onTyping={handleTyping}
+            otherPartyOnline={otherPartyOnline}
+            onLoadMore={handleLoadMore}
+            hasMore={hasMore}
+            isClosed={isClosed}
+            onEndChat={handleEndChat}
+            onPauseChat={handlePauseChat}
+            isPaused={isPaused}
+            onReactMessage={handleReactMessage}
+          />
+        </div>
       </div>
     </div>
   );

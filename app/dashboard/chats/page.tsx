@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { io } from "socket.io-client";
+import { io, Socket } from "socket.io-client";
 import { useTable, useSelect, useInvalidate, CanAccess } from "@refinedev/core";
 import { Conversation } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -24,6 +25,7 @@ export default function AgentInboxPage() {
 
   const [siteFilter, setSiteFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("OPEN");
+  const socketRef = useRef<Socket | null>(null);
 
   // Use Refine's useTable hook to fetch, paginate, and filter our resource
   const { tableQuery, currentPage, setCurrentPage, pageCount, setFilters } =
@@ -125,7 +127,17 @@ export default function AgentInboxPage() {
       });
     });
 
+    socketInstance.on("aiToggled", () => {
+      invalidate({
+        resource: "chat/conversations/active",
+        invalidates: ["list"],
+      });
+    });
+
+    socketRef.current = socketInstance;
+
     return () => {
+      socketRef.current = null;
       socketInstance.disconnect();
     };
   }, [session?.accessToken, invalidate]);
@@ -156,6 +168,15 @@ export default function AgentInboxPage() {
     } catch (error) {
       console.error(error);
       alert("Error deleting chat");
+    }
+  };
+
+  const handleToggleAi = (conversationId: string, currentStatus: boolean) => {
+    if (socketRef.current) {
+      socketRef.current.emit("toggleAi", {
+        conversationId,
+        isAiActive: !currentStatus,
+      });
     }
   };
 
@@ -246,6 +267,20 @@ export default function AgentInboxPage() {
                     {conv.status}
                   </Badge>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant={conv.isAiActive ? "default" : "outline"}
+                      size="sm"
+                      onClick={() =>
+                        handleToggleAi(conv.id, conv.isAiActive ?? true)
+                      }
+                      className="flex items-center gap-1"
+                      title={
+                        conv.isAiActive ? "AI Reply is ON" : "AI Reply is OFF"
+                      }
+                    >
+                      <Bot className="w-4 h-4" />
+                      {conv.isAiActive ? "AI: ON" : "AI: OFF"}
+                    </Button>
                     <Button
                       size="sm"
                       onClick={() => router.push(`/dashboard/chats/${conv.id}`)}

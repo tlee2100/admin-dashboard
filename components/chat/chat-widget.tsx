@@ -227,7 +227,7 @@ export function ChatWidget({
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 border rounded-2xl shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 px-4 py-3 border-b flex justify-between items-center z-10 shadow-sm">
+      <div className="bg-white dark:bg-slate-900 px-4 py-3 border-b flex justify-between items-center z-10 shadow-sm shrink-0">
         <div className="flex items-center gap-2">
           {isConnected ? (
             <Wifi className="w-4 h-4 text-green-500" />
@@ -336,7 +336,7 @@ export function ChatWidget({
       {/* Message List */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4 relative"
+        className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 relative"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -399,7 +399,7 @@ export function ChatWidget({
       </div>
 
       {/* Input Area */}
-      <div className="bg-white dark:bg-slate-900 p-3 border-t">
+      <div className="bg-white dark:bg-slate-900 p-3 border-t shrink-0">
         {isClosed ? (
           <div className="p-3 text-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-sm">
             This conversation is closed. You can no longer send messages.

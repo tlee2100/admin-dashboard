@@ -21,4 +21,5 @@ export interface Conversation {
   visitorEmail: string;
   lastActivityAt: string;
   latestMessage?: ChatMessage;
+  isAiActive?: boolean;
 }
