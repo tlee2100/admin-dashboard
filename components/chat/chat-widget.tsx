@@ -103,6 +103,35 @@ export function ChatWidget({
   });
   const isLoading = status === "submitted" || status === "streaming";
 
+  /**
+   * Converts the WebSocket/DB message history into the UIMessage format
+   * expected by useChat, so the model always receives the full conversation
+   * context. We exclude the last VISITOR message equal to `currentText`
+   * because sendMessage will append it itself.
+   */
+  const buildHistoryMessages = (currentText: string) => {
+    const history = messages.filter(
+      (m) =>
+        !(
+          m.senderType === "VISITOR" &&
+          m.content === currentText &&
+          m === messages[messages.length - 1]
+        ),
+    );
+    return history
+      .filter((m) => m.content)
+      .map((m) => ({
+        id: m.id,
+        role:
+          m.senderType === "VISITOR"
+            ? ("user" as const)
+            : ("assistant" as const),
+        content: m.content,
+        parts: [{ type: "text" as const, text: m.content }],
+        createdAt: new Date(m.createdAt),
+      }));
+  };
+
   // Auto-trigger first message stream if it's a new conversation
   useEffect(() => {
     if (
@@ -114,6 +143,8 @@ export function ChatWidget({
       currentUserType === "VISITOR" // Only visitor triggers stream
     ) {
       hasTriggeredFirstAi.current = true;
+      // First message: no prior history, ensure aiMessages is empty
+      setAiMessages([]);
       sendMessage({ text: messages[0].content });
     }
   }, [messages, isAiActive, conversationId, currentUserType, sendMessage]);
@@ -131,6 +162,15 @@ export function ChatWidget({
     if (isPrependingRef.current) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
+
+  // Follow the streaming answer as chunks arrive — instant scroll to avoid jitter
+  useEffect(() => {
+    if (status !== "streaming") return;
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [aiMessages, status]);
 
   // After prepending older messages, restore the scroll position synchronously before paint
   useLayoutEffect(() => {
@@ -215,6 +255,7 @@ export function ChatWidget({
         ) {
           // We do not append files to stream yet, just the text if any
           if (textToSend) {
+            setAiMessages(buildHistoryMessages(textToSend));
             sendMessage({ text: textToSend });
           }
         }
@@ -264,6 +305,7 @@ export function ChatWidget({
     onSendMessage(text);
 
     if (isAiActive && !isClosed && currentUserType === "VISITOR") {
+      setAiMessages(buildHistoryMessages(text));
       sendMessage({ text });
     }
 
@@ -465,13 +507,18 @@ export function ChatWidget({
               )
               .map((p) => p.text)
               .join("") || "";
-          // Display if there's a streaming message and it's not already covered by WS
+          // Show the streaming bubble only when:
+          // 1. Actively streaming (chunks arriving) — avoids the 'submitted' phase flash
+          // 2. Streaming finished but WS hasn't delivered the final message yet
+          // Guard on latestAiText to avoid showing an empty bubble
           if (
             latestAiMessage &&
-            (isLoading ||
-              !messages.find(
-                (m) => m.content === latestAiText && m.senderType === "AI",
-              ))
+            latestAiText &&
+            (status === "streaming" ||
+              (status === "ready" &&
+                !messages.find(
+                  (m) => m.content === latestAiText && m.senderType === "AI",
+                )))
           ) {
             return (
               <MessageBubble
