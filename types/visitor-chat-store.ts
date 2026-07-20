@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { ChatMessage, Conversation } from "../types/chat";
+import type { UIMessage } from "ai";
 
 interface VisitorChatState {
   currentConversation: Conversation | null;
@@ -9,6 +10,7 @@ interface VisitorChatState {
   isTyping: boolean;
   pendingMessages: string[];
   otherPartyOnline: boolean;
+  streamingMessages: UIMessage[];
 
   setConversation: (
     conversation: Conversation,
@@ -19,6 +21,7 @@ interface VisitorChatState {
   prependMessages: (messages: ChatMessage[]) => void;
   setConnectionStatus: (status: boolean) => void;
   setConversationStatus: (status: "OPEN" | "PAUSED" | "CLOSED") => void;
+  updateConversation: (updates: Partial<Conversation>) => void;
   setTyping: (status: boolean) => void;
   updateMessageStatus: (messageId: string, status: string) => void;
   updateMessageReactions: (
@@ -30,6 +33,7 @@ interface VisitorChatState {
   clearPendingMessages: () => void;
   setOtherPartyOnline: (online: boolean) => void;
   clearChat: () => void;
+  setStreamingMessages: (messages: UIMessage[]) => void;
 }
 
 export const useVisitorChatStore = create<VisitorChatState>()(
@@ -41,6 +45,7 @@ export const useVisitorChatStore = create<VisitorChatState>()(
       isTyping: false,
       pendingMessages: [],
       otherPartyOnline: false,
+      streamingMessages: [],
 
       setConversation: (conversation, firstMessage) =>
         set({
@@ -62,6 +67,13 @@ export const useVisitorChatStore = create<VisitorChatState>()(
         set((state) => ({
           currentConversation: state.currentConversation
             ? { ...state.currentConversation, status }
+            : null,
+        })),
+
+      updateConversation: (updates) =>
+        set((state) => ({
+          currentConversation: state.currentConversation
+            ? { ...state.currentConversation, ...updates }
             : null,
         })),
 
@@ -100,7 +112,14 @@ export const useVisitorChatStore = create<VisitorChatState>()(
       setOtherPartyOnline: (online) => set({ otherPartyOnline: online }),
 
       clearChat: () =>
-        set({ currentConversation: null, messages: [], isConnected: false }),
+        set({
+          currentConversation: null,
+          messages: [],
+          isConnected: false,
+          streamingMessages: [],
+        }),
+
+      setStreamingMessages: (messages) => set({ streamingMessages: messages }),
     }),
     {
       name: "visitor_chat_storage", // using underscore as requested by the user for visitor_conversation_id conceptually, but here we just rename it
@@ -109,6 +128,7 @@ export const useVisitorChatStore = create<VisitorChatState>()(
         currentConversation: state.currentConversation,
         messages: state.messages,
         pendingMessages: state.pendingMessages,
+        streamingMessages: state.streamingMessages,
       }),
     },
   ),

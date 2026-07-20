@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useChat } from "@ai-sdk/react";
 import { TextStreamChatTransport } from "ai";
+import type { UIMessage } from "ai";
 import { useMemo } from "react";
 
 interface ChatWidgetProps {
@@ -50,6 +51,8 @@ interface ChatWidgetProps {
   isAiActive?: boolean;
   otherPartyOnline?: boolean;
   hasMore?: boolean;
+  initialStreamingMessages?: UIMessage[];
+  onStreamingMessagesChange?: (messages: UIMessage[]) => void;
 }
 
 export function ChatWidget({
@@ -72,6 +75,8 @@ export function ChatWidget({
   onLoadMore,
   hasMore,
   conversationId,
+  initialStreamingMessages,
+  onStreamingMessagesChange,
 }: ChatWidgetProps) {
   const [inputValue, setInputValue] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -100,8 +105,16 @@ export function ChatWidget({
     setMessages: setAiMessages,
   } = useChat({
     transport,
+    messages: initialStreamingMessages,
   });
   const isLoading = status === "submitted" || status === "streaming";
+
+  // Sync Vercel AI state with the parent (Zustand store)
+  useEffect(() => {
+    if (onStreamingMessagesChange) {
+      onStreamingMessagesChange(aiMessages);
+    }
+  }, [aiMessages, onStreamingMessagesChange]);
 
   /**
    * Converts the WebSocket/DB message history into the UIMessage format
@@ -147,7 +160,14 @@ export function ChatWidget({
       setAiMessages([]);
       sendMessage({ text: messages[0].content });
     }
-  }, [messages, isAiActive, conversationId, currentUserType, sendMessage]);
+  }, [
+    messages,
+    isAiActive,
+    conversationId,
+    currentUserType,
+    sendMessage,
+    setAiMessages,
+  ]);
 
   // Clear HTTP streaming message when WebSocket delivers the final version
   useEffect(() => {
@@ -538,7 +558,7 @@ export function ChatWidget({
           return null;
         })()}
 
-        {isTyping && (
+        {(isTyping || status === "submitted") && (
           <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 text-sm italic pl-10">
             <span className="flex gap-1">
               <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>

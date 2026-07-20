@@ -25,6 +25,7 @@ export default function VisitorChatRoom() {
     addMessage,
     setConnectionStatus,
     setConversationStatus,
+    updateConversation,
     setTyping,
     updateMessageStatus,
     updateMessageReactions,
@@ -33,6 +34,8 @@ export default function VisitorChatRoom() {
     clearPendingMessages,
     setOtherPartyOnline,
     clearChat,
+    streamingMessages,
+    setStreamingMessages,
   } = useVisitorChatStore();
 
   const isClosed = currentConversation?.status === "CLOSED";
@@ -70,8 +73,25 @@ export default function VisitorChatRoom() {
 
     const fetchHistory = async () => {
       try {
+        const apiBase =
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
+        // Fetch fresh conversation metadata (isAiActive, status) from DB so we don't rely on stale Zustand persisted state
+        const metaRes = await fetch(
+          `${apiBase}/chat/conversations/${conversationId}/meta`,
+        );
+        if (metaRes.ok) {
+          const meta = await metaRes.json();
+          if (meta) {
+            updateConversation({
+              isAiActive: meta.isAiActive,
+              status: meta.status,
+            });
+          }
+        }
+
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/chat/conversations/${conversationId}/messages?limit=10`,
+          `${apiBase}/chat/conversations/${conversationId}/messages?limit=10`,
         );
         if (res.ok) {
           const data = await res.json();
@@ -84,7 +104,7 @@ export default function VisitorChatRoom() {
     };
 
     fetchHistory();
-  }, [mounted, currentConversation, conversationId]);
+  }, [mounted, currentConversation, conversationId, updateConversation]);
 
   // 3. Main WebSocket Logic
   useEffect(() => {
@@ -193,6 +213,15 @@ export default function VisitorChatRoom() {
         setConversationStatus("OPEN");
       }
     });
+
+    socketInstance.on(
+      "aiToggled",
+      (payload: { conversationId: string; isAiActive: boolean }) => {
+        if (payload.conversationId === conversationId) {
+          updateConversation({ isAiActive: payload.isAiActive });
+        }
+      },
+    );
 
     socketInstance.on(
       "messageReactionUpdated",
@@ -466,6 +495,8 @@ export default function VisitorChatRoom() {
             onPauseChat={handlePauseChat}
             isPaused={isPaused}
             onReactMessage={handleReactMessage}
+            initialStreamingMessages={streamingMessages}
+            onStreamingMessagesChange={setStreamingMessages}
           />
         </div>
       </div>
