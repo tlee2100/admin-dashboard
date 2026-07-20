@@ -3,12 +3,84 @@
 import { cn } from "@/lib/utils";
 import { ChatMessage } from "@/types/chat";
 import { User, Headset, Check, CheckCheck, Paperclip } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import type { Components } from "react-markdown";
 
 interface MessageBubbleProps {
   message: ChatMessage;
   isCurrentUser: boolean;
   onReact?: (messageId: string, emoji: string) => void;
 }
+
+/** Markdown rendered with scoped styles — used only for AI/Agent messages */
+const mdComponents: Components = {
+  p: ({ children }) => (
+    <p className="mb-1 last:mb-0 leading-relaxed">{children}</p>
+  ),
+  h1: ({ children }) => (
+    <h1 className="text-base font-bold mt-2 mb-1">{children}</h1>
+  ),
+  h2: ({ children }) => (
+    <h2 className="text-sm font-bold mt-2 mb-1">{children}</h2>
+  ),
+  h3: ({ children }) => (
+    <h3 className="text-sm font-semibold mt-1 mb-0.5">{children}</h3>
+  ),
+  ul: ({ children }) => (
+    <ul className="list-disc pl-4 mb-1 space-y-0.5">{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="list-decimal pl-4 mb-1 space-y-0.5">{children}</ol>
+  ),
+  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+  strong: ({ children }) => (
+    <strong className="font-semibold">{children}</strong>
+  ),
+  em: ({ children }) => <em className="italic">{children}</em>,
+  code: ({ children, className }) => {
+    const isBlock = className?.includes("language-");
+    return isBlock ? (
+      <code className="block bg-black/10 dark:bg-white/10 rounded px-2 py-1 text-xs font-mono whitespace-pre-wrap my-1 overflow-x-auto">
+        {children}
+      </code>
+    ) : (
+      <code className="bg-black/10 dark:bg-white/10 rounded px-1 text-xs font-mono">
+        {children}
+      </code>
+    );
+  },
+  pre: ({ children }) => <pre className="my-1 overflow-x-auto">{children}</pre>,
+  blockquote: ({ children }) => (
+    <blockquote className="border-l-2 border-current/30 pl-2 italic opacity-80 my-1">
+      {children}
+    </blockquote>
+  ),
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="underline underline-offset-2 opacity-80 hover:opacity-100"
+    >
+      {children}
+    </a>
+  ),
+  hr: () => <hr className="my-1 border-current/20" />,
+  table: ({ children }) => (
+    <div className="overflow-x-auto my-1">
+      <table className="text-xs border-collapse w-full">{children}</table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th className="border border-current/20 px-2 py-0.5 font-semibold bg-black/5 dark:bg-white/5">
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td className="border border-current/20 px-2 py-0.5">{children}</td>
+  ),
+};
 
 export function MessageBubble({
   message,
@@ -90,7 +162,19 @@ export function MessageBubble({
                 )}
               </div>
             )}
-            {message.content && <div>{message.content}</div>}
+            {message.content &&
+              (message.senderType === "AI" || message.senderType === "AGENT" ? (
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={mdComponents}
+                >
+                  {message.content}
+                </ReactMarkdown>
+              ) : (
+                <div className="whitespace-pre-wrap break-words">
+                  {message.content}
+                </div>
+              ))}
           </div>
 
           {/* Reactions */}
