@@ -108,6 +108,8 @@ export function ChatWidget({
     messages: initialStreamingMessages,
   });
   const isLoading = status === "submitted" || status === "streaming";
+  const isInputDisabled =
+    !isConnected || (currentUserType === "VISITOR" && isLoading);
 
   // Sync Vercel AI state with the parent (Zustand store)
   useEffect(() => {
@@ -584,7 +586,7 @@ export function ChatWidget({
                 multiple
                 className="hidden"
                 onChange={handleFileInput}
-                disabled={!isConnected || isUploading}
+                disabled={isInputDisabled || isUploading}
               />
               {isUploading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -599,13 +601,13 @@ export function ChatWidget({
               placeholder="Type your message..."
               className="min-h-[40px] max-h-[120px] resize-none border-0 shadow-none focus-visible:ring-0 bg-transparent text-sm py-3"
               rows={1}
-              disabled={!isConnected}
+              disabled={isInputDisabled}
             />
             <Button
               size="icon"
               className="rounded-lg mb-1 mr-1 h-9 w-9 shrink-0"
               onClick={handleSend}
-              disabled={(!inputValue.trim() && !isUploading) || !isConnected}
+              disabled={(!inputValue.trim() && !isUploading) || isInputDisabled}
             >
               <Send className="w-4 h-4" />
             </Button>
