@@ -27,8 +27,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      {/* suppressHydrationWarning: next-themes set class="dark" trên <html>
-          bằng JS sau khi mount, khác với server render ban đầu → tránh warning */}
+      <head>
+        <meta charSet="utf-8" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
