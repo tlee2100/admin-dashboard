@@ -11,47 +11,64 @@ export class TwoFactorRequiredError extends CredentialsSignin {
 
 const REFRESH_BUFFER_MS = 60 * 1000;
 
-let pendingRefreshPromise: Promise<JWT> | null = null;
+const pendingRefreshPromises = new Map<string, Promise<JWT>>();
+const tokenCache = new Map<string, JWT>();
 
 async function refreshAccessToken(token: JWT): Promise<JWT> {
-  // If a refresh is already in progress, wait for it instead of making a new request
-  if (pendingRefreshPromise) {
-    return pendingRefreshPromise;
+  const refreshToken = token.refreshToken as string;
+
+  // 1. Trả về token đã refresh nếu request cũ vừa mới refresh xong trong vòng 10 giây
+  if (tokenCache.has(refreshToken)) {
+    return tokenCache.get(refreshToken)!;
   }
 
-  // Create a new refresh promise
-  pendingRefreshPromise = (async () => {
+  // 2. Nếu một tiến trình refresh cho token này đang chạy, chờ nó xong
+  if (pendingRefreshPromises.has(refreshToken)) {
+    return pendingRefreshPromises.get(refreshToken)!;
+  }
+
+  // 3. Tạo promise refresh mới
+  const promise = (async () => {
     try {
       const res = await fetch(`${process.env.API_URL}/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken: token.refreshToken }),
+        body: JSON.stringify({ refreshToken }),
       });
 
       if (!res.ok) throw new Error("Refresh failed");
 
       const data = await res.json();
 
-      return {
+      const newToken = {
         ...token,
         accessToken: data.access_token,
         refreshToken: data.refresh_token, // rotation: luôn nhận refresh token mới
         accessTokenExpires: Date.now() + data.expires_in * 1000,
         error: undefined,
       };
+
+      // Cache token mới trong 10 giây để xử lý các request song song sử dụng cookie cũ
+      tokenCache.set(refreshToken, newToken);
+      setTimeout(() => {
+        tokenCache.delete(refreshToken);
+      }, 10000);
+
+      return newToken;
     } catch {
       return {
         ...token,
         accessToken: undefined,
-        error: "RefreshAccessTokenError",
+        error: "RefreshAccessTokenError" as const,
       };
     } finally {
-      // Clear the promise when done so subsequent expirations can trigger a new refresh
-      pendingRefreshPromise = null;
+      // Xoá promise khỏi danh sách chờ khi đã hoàn thành
+      pendingRefreshPromises.delete(refreshToken);
     }
   })();
 
-  return pendingRefreshPromise;
+  pendingRefreshPromises.set(refreshToken, promise);
+  return promise;
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({

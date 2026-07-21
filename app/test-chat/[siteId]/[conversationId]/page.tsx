@@ -62,14 +62,19 @@ export default function VisitorChatRoom() {
     }
   }, [mounted, currentConversation, conversationId, params.siteId, router]);
 
+  const hasFetchedHistory = useRef(false);
+
   // Fetch initial messages like agent dashboard
   useEffect(() => {
     if (
       !mounted ||
       !currentConversation ||
-      currentConversation.id !== conversationId
+      currentConversation.id !== conversationId ||
+      hasFetchedHistory.current
     )
       return;
+
+    hasFetchedHistory.current = true;
 
     const fetchHistory = async () => {
       try {
@@ -86,6 +91,7 @@ export default function VisitorChatRoom() {
             updateConversation({
               isAiActive: meta.isAiActive,
               status: meta.status,
+              handlingStatus: meta.handlingStatus,
             });
           }
         }
@@ -219,6 +225,30 @@ export default function VisitorChatRoom() {
       (payload: { conversationId: string; isAiActive: boolean }) => {
         if (payload.conversationId === conversationId) {
           updateConversation({ isAiActive: payload.isAiActive });
+        }
+      },
+    );
+
+    socketInstance.on(
+      "agentJoined",
+      (payload: {
+        conversationId: string;
+        handlingStatus: "AGENT_HANDLING";
+      }) => {
+        if (payload.conversationId === conversationId) {
+          updateConversation({ handlingStatus: payload.handlingStatus });
+        }
+      },
+    );
+
+    socketInstance.on(
+      "handlingStatusUpdated",
+      (payload: {
+        conversationId: string;
+        handlingStatus: "WAITING_FOR_AGENT";
+      }) => {
+        if (payload.conversationId === conversationId) {
+          updateConversation({ handlingStatus: payload.handlingStatus });
         }
       },
     );
@@ -442,7 +472,10 @@ export default function VisitorChatRoom() {
 
   const handleEndChat = () => {
     if (confirm("Are you sure you want to end this chat?")) {
-      if (socket) socket.disconnect();
+      if (socket && isConnected) {
+        socket.emit("endConversation", { conversationId });
+        socket.disconnect();
+      }
       clearChat();
       router.push(`/test-chat/${params.siteId}`);
     }
@@ -466,7 +499,11 @@ export default function VisitorChatRoom() {
               Chat Support
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-              We usually reply in a few minutes
+              {currentConversation?.handlingStatus === "WAITING_FOR_AGENT"
+                ? "Waiting for Agent..."
+                : currentConversation?.handlingStatus === "AGENT_HANDLING"
+                  ? "Agent is here"
+                  : "We usually reply in a few minutes"}
             </p>
           </div>
           <button

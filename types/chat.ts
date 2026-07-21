@@ -22,4 +22,5 @@ export interface Conversation {
   lastActivityAt: string;
   latestMessage?: ChatMessage;
   isAiActive?: boolean;
+  handlingStatus?: "AI_HANDLING" | "WAITING_FOR_AGENT" | "AGENT_HANDLING";
 }

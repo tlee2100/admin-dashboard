@@ -18,13 +18,31 @@ import {
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 
+const getInitialFilter = (field: string, defaultValue: string = "") => {
+  if (typeof window === "undefined") return defaultValue;
+  const params = new URLSearchParams(window.location.search);
+  for (const [key, val] of params.entries()) {
+    if (key.includes("[field]") && val === field) {
+      const match = key.match(/filters\[(\d+)\]/);
+      if (match)
+        return params.get(`filters[${match[1]}][value]`) || defaultValue;
+    }
+  }
+  return defaultValue;
+};
+
 export default function AgentInboxPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const invalidate = useInvalidate();
 
-  const [siteFilter, setSiteFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("OPEN");
+  const [siteFilter, setSiteFilter] = useState<string>(() =>
+    getInitialFilter("siteId", "all"),
+  );
+  const [statusFilter, setStatusFilter] = useState<string>(() =>
+    getInitialFilter("status", "OPEN"),
+  );
+
   const socketRef = useRef<Socket | null>(null);
 
   // Use Refine's useTable hook to fetch, paginate, and filter our resource
@@ -52,7 +70,7 @@ export default function AgentInboxPage() {
           },
         ],
       },
-      syncWithLocation: false, // We don't need query params for this internal dashboard view
+      syncWithLocation: true,
     });
 
   const { data, isLoading } = tableQuery;
@@ -66,7 +84,12 @@ export default function AgentInboxPage() {
     optionValue: "id",
   });
 
+  const isFirstRender = useRef(true);
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     // Sync local state filters to Refine
     const filters = [];
     if (siteFilter !== "all") {
@@ -85,7 +108,8 @@ export default function AgentInboxPage() {
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setFilters(filters as any, "replace");
-  }, [siteFilter, statusFilter, setFilters]);
+    setCurrentPage(1);
+  }, [siteFilter, statusFilter, setFilters, setCurrentPage]);
 
   // Socket setup for real-time invalidation
   useEffect(() => {
@@ -197,6 +221,7 @@ export default function AgentInboxPage() {
             className="flex h-10 w-full sm:w-[130px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <option value="OPEN">Open</option>
+            <option value="PAUSED">Paused</option>
             <option value="CLOSED">Closed</option>
             <option value="all">All Status</option>
           </select>
@@ -266,6 +291,19 @@ export default function AgentInboxPage() {
                   >
                     {conv.status}
                   </Badge>
+                  {conv.status === "OPEN" && conv.handlingStatus && (
+                    <Badge
+                      variant={
+                        conv.handlingStatus === "WAITING_FOR_AGENT"
+                          ? "destructive"
+                          : conv.handlingStatus === "AGENT_HANDLING"
+                            ? "default"
+                            : "secondary"
+                      }
+                    >
+                      {conv.handlingStatus.replace(/_/g, " ")}
+                    </Badge>
+                  )}
                   <div className="flex items-center gap-2">
                     <Button
                       variant={conv.isAiActive ? "default" : "outline"}

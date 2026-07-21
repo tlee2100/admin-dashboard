@@ -3,7 +3,7 @@
 import { useTable, useDelete, CanAccess, useSelect } from "@refinedev/core";
 import { useForm } from "@refinedev/react-hook-form";
 import { useSession } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Pencil,
   Trash2,
@@ -39,6 +39,19 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+const getInitialFilter = (field: string, defaultValue: string = "") => {
+  if (typeof window === "undefined") return defaultValue;
+  const params = new URLSearchParams(window.location.search);
+  for (const [key, val] of params.entries()) {
+    if (key.includes("[field]") && val === field) {
+      const match = key.match(/filters\[(\d+)\]/);
+      if (match)
+        return params.get(`filters[${match[1]}][value]`) || defaultValue;
+    }
+  }
+  return defaultValue;
+};
+
 export default function SitesListPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -46,8 +59,10 @@ export default function SitesListPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   //States cho Filter
-  const [searchName, setSearchName] = useState("");
-  const [filterKbStatus, setFilterKbStatus] = useState("");
+  const [searchName, setSearchName] = useState(() => getInitialFilter("name"));
+  const [filterKbStatus, setFilterKbStatus] = useState(() =>
+    getInitialFilter("knowledgeBaseStatus"),
+  );
 
   // States cho Document Drawer
   const [docSiteId, setDocSiteId] = useState<string | null>(null);
@@ -118,7 +133,12 @@ export default function SitesListPage() {
     onFinish(payload);
   };
 
+  const isFirstRender = useRef(true);
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     const delayDebounceFn = setTimeout(() => {
       setFilters([
         { field: "name", operator: "contains", value: searchName },

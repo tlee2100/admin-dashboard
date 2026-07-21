@@ -28,6 +28,20 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { DocumentDrawer } from "@/components/dashboard/document-drawer";
+import { useRef } from "react";
+
+const getInitialFilter = (field: string, defaultValue: string = "") => {
+  if (typeof window === "undefined") return defaultValue;
+  const params = new URLSearchParams(window.location.search);
+  for (const [key, val] of params.entries()) {
+    if (key.includes("[field]") && val === field) {
+      const match = key.match(/filters\[(\d+)\]/);
+      if (match)
+        return params.get(`filters[${match[1]}][value]`) || defaultValue;
+    }
+  }
+  return defaultValue;
+};
 
 export default function DocumentsListPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -40,9 +54,13 @@ export default function DocumentsListPage() {
   );
 
   // States cho Filter
-  const [searchName, setSearchName] = useState("");
-  const [filterSiteId, setFilterSiteId] = useState("");
-  const [debouncedName, setDebouncedName] = useState("");
+  const [searchName, setSearchName] = useState(() =>
+    getInitialFilter("filename"),
+  );
+  const [filterSiteId, setFilterSiteId] = useState(() =>
+    getInitialFilter("siteId"),
+  );
+  const [debouncedName, setDebouncedName] = useState(searchName); // initialized to searchName
 
   const {
     tableQuery,
@@ -88,7 +106,12 @@ export default function DocumentsListPage() {
   }, [searchName]);
 
   // Apply filters instantly when debounced text OR filterSiteId changes
+  const isFirstRender = useRef(true);
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     setFilters([
       { field: "filename", operator: "contains", value: debouncedName },
       { field: "siteId", operator: "eq", value: filterSiteId },

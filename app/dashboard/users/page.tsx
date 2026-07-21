@@ -2,7 +2,7 @@
 
 import { useTable, useDelete, useSelect, useCan } from "@refinedev/core";
 import { useForm } from "@refinedev/react-hook-form";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -25,6 +25,19 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+
+const getInitialFilter = (field: string, defaultValue: string = "") => {
+  if (typeof window === "undefined") return defaultValue;
+  const params = new URLSearchParams(window.location.search);
+  for (const [key, val] of params.entries()) {
+    if (key.includes("[field]") && val === field) {
+      const match = key.match(/filters\[(\d+)\]/);
+      if (match)
+        return params.get(`filters[${match[1]}][value]`) || defaultValue;
+    }
+  }
+  return defaultValue;
+};
 
 export default function UsersListPage() {
   const { data: session, status } = useSession();
@@ -53,14 +66,17 @@ export default function UsersListPage() {
   const [pendingSiteId, setPendingSiteId] = useState<string | null>(null);
 
   // Lưu state input tìm kiếm cục bộ trước khi trigger lọc
-  const [searchName, setSearchName] = useState("");
-  const [searchEmail, setSearchEmail] = useState("");
-  const [searchRole, setSearchRole] = useState("");
+  const [searchName, setSearchName] = useState(() => getInitialFilter("name"));
+  const [searchEmail, setSearchEmail] = useState(() =>
+    getInitialFilter("email"),
+  );
+  const [searchRole, setSearchRole] = useState(() => getInitialFilter("role"));
 
   const { tableQuery, currentPage, setCurrentPage, pageCount, setFilters } =
     useTable({
       resource: "users",
       pagination: { pageSize: 10 },
+      syncWithLocation: true,
     });
 
   const { mutate: deleteUser, mutation: deleteMutation } = useDelete();
@@ -168,8 +184,8 @@ export default function UsersListPage() {
     }
   }, [editId, query?.data?.data, reset]);
 
-  const [debouncedName, setDebouncedName] = useState("");
-  const [debouncedEmail, setDebouncedEmail] = useState("");
+  const [debouncedName, setDebouncedName] = useState(searchName);
+  const [debouncedEmail, setDebouncedEmail] = useState(searchEmail);
 
   // Debounce text inputs (300ms)
   useEffect(() => {
@@ -181,7 +197,12 @@ export default function UsersListPage() {
   }, [searchName, searchEmail]);
 
   // Apply filters instantly when debounced text OR searchRole changes
+  const isFirstRender = useRef(true);
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     setFilters([
       { field: "name", operator: "eq", value: debouncedName },
       { field: "email", operator: "eq", value: debouncedEmail },
