@@ -49,6 +49,7 @@ interface ChatWidgetProps {
   isClosed?: boolean;
   isPaused?: boolean;
   isAiActive?: boolean;
+  isWaitingForAgent?: boolean;
   otherPartyOnline?: boolean;
   hasMore?: boolean;
   initialStreamingMessages?: UIMessage[];
@@ -69,6 +70,7 @@ export function ChatWidget({
   isClosed,
   isPaused,
   isAiActive,
+  isWaitingForAgent,
   otherPartyOnline,
   onPauseChat,
   onReactMessage,
@@ -108,8 +110,11 @@ export function ChatWidget({
     messages: initialStreamingMessages,
   });
   const isLoading = status === "submitted" || status === "streaming";
+  const visitorIsWaiting = currentUserType === "VISITOR" && isWaitingForAgent;
   const isInputDisabled =
-    !isConnected || (currentUserType === "VISITOR" && isLoading);
+    !isConnected ||
+    (currentUserType === "VISITOR" && isLoading) ||
+    visitorIsWaiting;
 
   // Sync Vercel AI state with the parent (Zustand store)
   useEffect(() => {
@@ -572,11 +577,14 @@ export function ChatWidget({
         <div ref={bottomRef} />
       </div>
 
-      {/* Input Area */}
       <div className="bg-white dark:bg-slate-900 p-3 border-t shrink-0">
         {isClosed ? (
           <div className="p-3 text-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-sm">
             This conversation is closed. You can no longer send messages.
+          </div>
+        ) : visitorIsWaiting ? (
+          <div className="p-3 text-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-500 text-sm">
+            An agent will be with you shortly. Please wait...
           </div>
         ) : (
           <div className="flex gap-2 items-end bg-slate-50 dark:bg-slate-950 border rounded-xl focus-within:ring-2 focus-within:ring-primary/50 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all p-1">

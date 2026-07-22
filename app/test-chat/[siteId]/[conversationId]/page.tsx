@@ -528,6 +528,9 @@ export default function VisitorChatRoom() {
             hasMore={hasMore}
             isClosed={isClosed}
             isAiActive={currentConversation?.isAiActive ?? true}
+            isWaitingForAgent={
+              currentConversation?.handlingStatus === "WAITING_FOR_AGENT"
+            }
             onEndChat={handleEndChat}
             onPauseChat={handlePauseChat}
             isPaused={isPaused}
