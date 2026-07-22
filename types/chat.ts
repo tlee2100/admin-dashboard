@@ -11,6 +11,7 @@ export interface ChatMessage {
   fileName?: string;
   fileType?: string;
   reactions?: Record<string, string[]>;
+  knowledgeSources?: { documentId: number; filename: string }[];
 }
 
 export interface Conversation {

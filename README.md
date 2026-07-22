@@ -19,7 +19,7 @@ This project is built with a modern React stack:
 ### Prerequisites
 
 - Node.js (LTS recommended)
-- The NestJS backend (Chatbot API) must be running on `http://localhost:3000`
+- The NestJS backend (Chatbot API) must be running on `http://localhost:3000` (ensure the backend is running with its `pgvector`-enabled PostgreSQL container).
 
 ### Installation
 

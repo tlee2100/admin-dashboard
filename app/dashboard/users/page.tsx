@@ -151,15 +151,15 @@ export default function UsersListPage() {
 
     if (payload.siteId) {
       setPendingSiteId(payload.siteId as string);
-      delete payload.siteId;
     } else {
       setPendingSiteId(null);
     }
+    delete payload.siteId;
 
     if (payload.password === "") {
       delete payload.password;
     }
-    if (payload.organizationId === "") {
+    if (payload.organizationId === "" || payload.organizationId === null) {
       delete payload.organizationId;
     }
     delete payload.role;

@@ -34,6 +34,18 @@ export default function ChatLandingPage() {
   });
 
   useEffect(() => {
+    // If the visitor already has an active session, redirect them directly to the chat
+    const store = useVisitorChatStore.getState();
+    const activeConversation = store.currentConversation;
+    if (activeConversation && activeConversation.siteId.toString() === siteId) {
+      if (activeConversation.status !== "CLOSED") {
+        router.push(`/test-chat/${siteId}/${activeConversation.id}`);
+        return; // Don't fetch site info if we're redirecting
+      } else {
+        store.clearChat();
+      }
+    }
+
     const fetchSiteInfo = async () => {
       try {
         const res = await fetch(
