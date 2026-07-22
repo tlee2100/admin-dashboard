@@ -323,7 +323,7 @@ export default function AgentInboxPage() {
                       size="sm"
                       onClick={() => router.push(`/dashboard/chats/${conv.id}`)}
                     >
-                      Join Chat
+                      View
                     </Button>
                     <CanAccess
                       action="delete"

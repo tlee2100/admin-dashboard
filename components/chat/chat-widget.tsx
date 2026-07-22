@@ -54,6 +54,8 @@ interface ChatWidgetProps {
   hasMore?: boolean;
   initialStreamingMessages?: UIMessage[];
   onStreamingMessagesChange?: (messages: UIMessage[]) => void;
+  isJoined?: boolean;
+  onJoinChat?: () => void;
 }
 
 export function ChatWidget({
@@ -79,6 +81,8 @@ export function ChatWidget({
   conversationId,
   initialStreamingMessages,
   onStreamingMessagesChange,
+  isJoined,
+  onJoinChat,
 }: ChatWidgetProps) {
   const [inputValue, setInputValue] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -518,6 +522,7 @@ export function ChatWidget({
             message={msg}
             isCurrentUser={msg.senderType === currentUserType}
             onReact={onReactMessage}
+            currentUserType={currentUserType}
           />
         ))}
 
@@ -559,6 +564,7 @@ export function ChatWidget({
                   status: "SENT",
                 }}
                 isCurrentUser={false}
+                currentUserType={currentUserType}
               />
             );
           }
@@ -585,6 +591,12 @@ export function ChatWidget({
         ) : visitorIsWaiting ? (
           <div className="p-3 text-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-500 text-sm">
             An agent will be with you shortly. Please wait...
+          </div>
+        ) : currentUserType === "AGENT" && isJoined === false ? (
+          <div className="flex justify-center p-2">
+            <Button onClick={onJoinChat} className="w-full font-semibold">
+              Join Chat
+            </Button>
           </div>
         ) : (
           <div className="flex gap-2 items-end bg-slate-50 dark:bg-slate-950 border rounded-xl focus-within:ring-2 focus-within:ring-primary/50 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all p-1">

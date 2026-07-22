@@ -11,6 +11,7 @@ interface MessageBubbleProps {
   message: ChatMessage;
   isCurrentUser: boolean;
   onReact?: (messageId: string, emoji: string) => void;
+  currentUserType?: "VISITOR" | "AGENT";
 }
 
 /** Markdown rendered with scoped styles — used only for AI/Agent messages */
@@ -86,6 +87,7 @@ export function MessageBubble({
   message,
   isCurrentUser,
   onReact,
+  currentUserType = "VISITOR",
 }: MessageBubbleProps) {
   return (
     <div
@@ -178,21 +180,23 @@ export function MessageBubble({
           </div>
 
           {/* Knowledge Sources */}
-          {message.knowledgeSources && message.knowledgeSources.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-1">
-              <span className="text-[10px] italic text-slate-400 self-center mr-1">
-                Sources:
-              </span>
-              {message.knowledgeSources.map((source, idx) => (
-                <span
-                  key={`${source.documentId}-${idx}`}
-                  className="px-1.5 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300 rounded text-[9px] font-medium"
-                >
-                  {source.filename}
+          {currentUserType !== "VISITOR" &&
+            message.knowledgeSources &&
+            message.knowledgeSources.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                <span className="text-[10px] italic text-slate-400 self-center mr-1">
+                  Sources:
                 </span>
-              ))}
-            </div>
-          )}
+                {message.knowledgeSources.map((source, idx) => (
+                  <span
+                    key={`${source.documentId}-${idx}`}
+                    className="px-1.5 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300 rounded text-[9px] font-medium"
+                  >
+                    {source.filename}
+                  </span>
+                ))}
+              </div>
+            )}
 
           {/* Reactions */}
           {message.reactions && Object.keys(message.reactions).length > 0 && (

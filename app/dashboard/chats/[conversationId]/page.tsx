@@ -22,6 +22,7 @@ export default function AgentChatRoom() {
   const [isClosed, setIsClosed] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isAiActive, setIsAiActive] = useState(true);
+  const [isJoined, setIsJoined] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const {
     messagesByConversation,
@@ -57,8 +58,13 @@ export default function AgentChatRoom() {
 
   // Fetch conversation history and status
   useEffect(() => {
-    const fetchHistoryAndStatus = async () => {
+    let socketInstance: Socket | null = null;
+    let isMounted = true;
+
+    const init = async () => {
       if (!session?.accessToken) return;
+
+      let userJoined = false;
       try {
         // Fetch status
         const infoRes = await fetch(
@@ -71,9 +77,23 @@ export default function AgentChatRoom() {
         );
         if (infoRes.ok) {
           const info = await infoRes.json();
+          if (!isMounted) return;
           setIsClosed(info.status === "CLOSED");
           setIsPaused(info.status === "PAUSED");
           setIsAiActive(info.isAiActive !== false); // default to true
+
+          const currentAgentId = info.agentId
+            ? String(info.agentId)
+            : info.agent?.id
+              ? String(info.agent.id)
+              : null;
+          const userId = session?.user?.id ? String(session.user.id) : null;
+          userJoined = !!(
+            currentAgentId &&
+            userId &&
+            currentAgentId === userId
+          );
+          setIsJoined(userJoined);
         }
 
         // Fetch messages
@@ -88,6 +108,7 @@ export default function AgentChatRoom() {
 
         if (res.ok) {
           const data = await res.json();
+          if (!isMounted) return;
           setMessages(conversationId, data);
           if (data.length < PAGE_LIMIT) setHasMore(false);
         } else {
@@ -96,192 +117,204 @@ export default function AgentChatRoom() {
       } catch (err) {
         console.error(err);
       }
-    };
 
-    fetchHistoryAndStatus();
+      if (!isMounted) return;
 
-    // Setup Socket
-    const socketInstance = io(
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000",
-      {
-        query: {
-          conversationId,
-        },
-        auth: {
-          token: session?.accessToken,
-        },
-      },
-    );
-
-    socketInstance.on("connect", () => {
-      setSocket(socketInstance);
-      setIsConnected(true);
-
-      // Request presence from other party by emitting our own presence
-      socketInstance.emit("joinConversation", { conversationId });
-
-      // Mark unread messages as READ if window is focused
-      if (document.hasFocus()) {
-        messagesRef.current.forEach((m) => {
-          if (m.senderType === "VISITOR" && m.status !== "READ") {
-            socketInstance.emit("markAsRead", {
-              conversationId,
-              messageId: m.id,
-            });
-          }
-        });
-      }
-    });
-
-    socketInstance.on("disconnect", () => {
-      setIsConnected(false);
-      setOtherPartyOnline(conversationId, false);
-    });
-
-    socketInstance.on(
-      "newMessage",
-      (payload: {
-        id: string;
-        conversationId: string;
-        message: string;
-        senderType: "VISITOR" | "AGENT";
-        createdAt: string;
-        fileUrl?: string;
-        fileName?: string;
-        fileType?: string;
-        reactions?: Record<string, string[]>;
-      }) => {
-        if (payload.conversationId === conversationId) {
-          addMessage(conversationId, {
-            id: payload.id || uuidv4(),
-            conversationId: payload.conversationId,
-            content: payload.message,
-            senderType: payload.senderType,
-            createdAt: payload.createdAt || new Date().toISOString(),
-            fileUrl: payload.fileUrl,
-            fileName: payload.fileName,
-            fileType: payload.fileType,
-            reactions: payload.reactions,
-          });
-
-          // Automatically mark the incoming message as read if the window is focused
-          if (
-            document.hasFocus() &&
-            payload.senderType === "VISITOR" &&
-            payload.id
-          ) {
-            socketInstance.emit("markAsRead", {
-              conversationId,
-              messageId: payload.id,
-            });
-          }
-        }
-      },
-    );
-
-    socketInstance.on("joinError", (error) => {
-      alert(error.message || "Unable to join conversation.");
-      router.push("/dashboard/chats");
-    });
-
-    socketInstance.on(
-      "typing",
-      (payload: { conversationId: string; isTyping: boolean }) => {
-        if (payload.conversationId === conversationId) {
-          setTyping(conversationId, payload.isTyping);
-        }
-      },
-    );
-
-    socketInstance.on("conversationClosed", (payload: { id: string }) => {
-      if (payload.id === conversationId) {
-        setIsClosed(true);
-      }
-    });
-
-    socketInstance.on("conversationPaused", (payload: { id: string }) => {
-      if (payload.id === conversationId) {
-        setIsPaused(true);
-      }
-    });
-
-    socketInstance.on("conversationResumed", (payload: { id: string }) => {
-      if (payload.id === conversationId) {
-        setIsPaused(false);
-      }
-    });
-
-    socketInstance.on(
-      "aiToggled",
-      (payload: { conversationId: string; isAiActive: boolean }) => {
-        if (payload.conversationId === conversationId) {
-          setIsAiActive(payload.isAiActive);
-        }
-      },
-    );
-
-    socketInstance.on(
-      "messageReactionUpdated",
-      (payload: { messageId: string; reactions: Record<string, string[]> }) => {
-        updateMessageReactions(
-          conversationId,
-          payload.messageId,
-          payload.reactions,
-        );
-      },
-    );
-
-    socketInstance.on(
-      "participantPresence",
-      (payload: { online: boolean; senderType?: string }) => {
-        // If we are an agent, we care if the visitor is online or another agent
-        if (payload.senderType === "VISITOR" || payload.online === false) {
-          setOtherPartyOnline(conversationId, payload.online);
-        }
-      },
-    );
-
-    socketInstance.on("presenceRequested", () => {
-      socketInstance.emit("announcePresence", {
-        conversationId,
-        senderType: "AGENT",
-      });
-    });
-
-    socketInstance.on(
-      "messageStatus",
-      (payload: { messageId: string; status: string }) => {
-        updateMessageStatus(conversationId, payload.messageId, payload.status);
-      },
-    );
-
-    socketInstance.on(
-      "messageSaved",
-      (payload: {
-        localId?: string;
-        id: string;
-        status?: string;
-        fileUrl?: string;
-        fileName?: string;
-        fileType?: string;
-        reactions?: Record<string, string[]>;
-      }) => {
-        if (payload.localId) {
-          replaceMessageId(
+      // Setup Socket
+      socketInstance = io(
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000",
+        {
+          query: {
             conversationId,
-            payload.localId,
-            payload.id,
+          },
+          auth: {
+            token: session?.accessToken,
+          },
+        },
+      );
+
+      socketInstance.on("connect", () => {
+        setSocket(socketInstance);
+        setIsConnected(true);
+
+        if (userJoined) {
+          socketInstance?.emit("joinConversation", { conversationId });
+        } else {
+          socketInstance?.emit("subscribeConversation", { conversationId });
+        }
+
+        // Mark unread messages as READ if window is focused
+        if (document.hasFocus()) {
+          messagesRef.current.forEach((m) => {
+            if (m.senderType === "VISITOR" && m.status !== "READ") {
+              socketInstance?.emit("markAsRead", {
+                conversationId,
+                messageId: m.id,
+              });
+            }
+          });
+        }
+      });
+
+      socketInstance.on("disconnect", () => {
+        setIsConnected(false);
+        setOtherPartyOnline(conversationId, false);
+      });
+
+      socketInstance.on(
+        "newMessage",
+        (payload: {
+          id: string;
+          conversationId: string;
+          message: string;
+          senderType: "VISITOR" | "AGENT" | "AI";
+          createdAt: string;
+          fileUrl?: string;
+          fileName?: string;
+          fileType?: string;
+          reactions?: Record<string, string[]>;
+        }) => {
+          if (payload.conversationId === conversationId) {
+            addMessage(conversationId, {
+              id: payload.id || uuidv4(),
+              conversationId: payload.conversationId,
+              content: payload.message,
+              senderType: payload.senderType,
+              createdAt: payload.createdAt || new Date().toISOString(),
+              fileUrl: payload.fileUrl,
+              fileName: payload.fileName,
+              fileType: payload.fileType,
+              reactions: payload.reactions,
+            });
+
+            // Automatically mark the incoming message as read if the window is focused
+            if (
+              document.hasFocus() &&
+              payload.senderType === "VISITOR" &&
+              payload.id
+            ) {
+              socketInstance?.emit("markAsRead", {
+                conversationId,
+                messageId: payload.id,
+              });
+            }
+          }
+        },
+      );
+
+      socketInstance.on("joinError", (error) => {
+        alert(error.message || "Unable to join conversation.");
+        router.push("/dashboard/chats");
+      });
+
+      socketInstance.on(
+        "typing",
+        (payload: { conversationId: string; isTyping: boolean }) => {
+          if (payload.conversationId === conversationId) {
+            setTyping(conversationId, payload.isTyping);
+          }
+        },
+      );
+
+      socketInstance.on("conversationClosed", (payload: { id: string }) => {
+        if (payload.id === conversationId) {
+          setIsClosed(true);
+        }
+      });
+
+      socketInstance.on("conversationPaused", (payload: { id: string }) => {
+        if (payload.id === conversationId) {
+          setIsPaused(true);
+        }
+      });
+
+      socketInstance.on("conversationResumed", (payload: { id: string }) => {
+        if (payload.id === conversationId) {
+          setIsPaused(false);
+        }
+      });
+
+      socketInstance.on(
+        "aiToggled",
+        (payload: { conversationId: string; isAiActive: boolean }) => {
+          if (payload.conversationId === conversationId) {
+            setIsAiActive(payload.isAiActive);
+          }
+        },
+      );
+
+      socketInstance.on(
+        "messageReactionUpdated",
+        (payload: {
+          messageId: string;
+          reactions: Record<string, string[]>;
+        }) => {
+          updateMessageReactions(
+            conversationId,
+            payload.messageId,
+            payload.reactions,
+          );
+        },
+      );
+
+      socketInstance.on(
+        "participantPresence",
+        (payload: { online: boolean; senderType?: string }) => {
+          // If we are an agent, we care if the visitor is online or another agent
+          if (payload.senderType === "VISITOR" || payload.online === false) {
+            setOtherPartyOnline(conversationId, payload.online);
+          }
+        },
+      );
+
+      socketInstance.on("presenceRequested", () => {
+        socketInstance?.emit("announcePresence", {
+          conversationId,
+          senderType: "AGENT",
+        });
+      });
+
+      socketInstance.on(
+        "messageStatus",
+        (payload: { messageId: string; status: string }) => {
+          updateMessageStatus(
+            conversationId,
+            payload.messageId,
             payload.status,
           );
-        }
-      },
-    );
+        },
+      );
+
+      socketInstance.on(
+        "messageSaved",
+        (payload: {
+          localId?: string;
+          id: string;
+          status?: string;
+          fileUrl?: string;
+          fileName?: string;
+          fileType?: string;
+          reactions?: Record<string, string[]>;
+        }) => {
+          if (payload.localId) {
+            replaceMessageId(
+              conversationId,
+              payload.localId,
+              payload.id,
+              payload.status,
+            );
+          }
+        },
+      );
+    };
+
+    init();
 
     const handleFocus = () => {
-      if (!socketInstance.connected) return;
+      if (!socketInstance?.connected) return;
       messagesRef.current.forEach((m) => {
         if (m.senderType === "VISITOR" && m.status !== "READ") {
-          socketInstance.emit("markAsRead", {
+          socketInstance?.emit("markAsRead", {
             conversationId,
             messageId: m.id,
           });
@@ -292,12 +325,14 @@ export default function AgentChatRoom() {
     window.addEventListener("focus", handleFocus);
 
     return () => {
+      isMounted = false;
       window.removeEventListener("focus", handleFocus);
-      socketInstance.disconnect();
+      socketInstance?.disconnect();
     };
   }, [
     session?.accessToken,
     conversationId,
+    session?.user?.id,
     addMessage,
     setTyping,
     setOtherPartyOnline,
@@ -466,6 +501,12 @@ export default function AgentChatRoom() {
     router.push("/dashboard/chats");
   };
 
+  const handleJoinChat = () => {
+    if (!socket || !isConnected) return;
+    socket.emit("joinConversation", { conversationId });
+    setIsJoined(true);
+  };
+
   return (
     <div className="h-[calc(100vh-4rem)] p-4">
       <ChatWidget
@@ -476,6 +517,7 @@ export default function AgentChatRoom() {
         isClosed={isClosed}
         isPaused={isPaused}
         isAiActive={isAiActive}
+        isJoined={isJoined}
         otherPartyOnline={otherPartyOnline}
         currentUserType="AGENT"
         onSendMessage={handleSendMessage}
@@ -487,6 +529,7 @@ export default function AgentChatRoom() {
         onToggleAi={handleToggleAi}
         onEndChat={handleEndChat}
         onCloseChat={handleCloseWindow}
+        onJoinChat={handleJoinChat}
       />
     </div>
   );
