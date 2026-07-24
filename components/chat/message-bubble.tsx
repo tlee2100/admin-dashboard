@@ -168,12 +168,29 @@ export function MessageBubble({
             )}
             {message.content &&
               (message.senderType === "AI" || message.senderType === "AGENT" ? (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={mdComponents}
-                >
-                  {message.content}
-                </ReactMarkdown>
+                (() => {
+                  let displayContent = message.content || "";
+                  // Replace fully closed think blocks
+                  displayContent = displayContent.replace(
+                    /<think>[\s\S]*?<\/think>/g,
+                    "> *Finished thinking*\n\n",
+                  );
+                  // Replace currently streaming unclosed think block
+                  if (displayContent.includes("<think>")) {
+                    displayContent = displayContent.replace(
+                      /<think>[\s\S]*/g,
+                      "> *Thinking...*\n\n",
+                    );
+                  }
+                  return (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={mdComponents}
+                    >
+                      {displayContent}
+                    </ReactMarkdown>
+                  );
+                })()
               ) : (
                 <div className="whitespace-pre-wrap break-words">
                   {message.content}
