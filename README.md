@@ -6,13 +6,13 @@ A robust Next.js administrative dashboard application designed to interface with
 
 This project is built with a modern React stack:
 
-- **Framework**: [Next.js 16](https://nextjs.org/) (App Router)
+- **Framework**: [Next.js 16.2](https://nextjs.org/) (App Router)
 - **Authentication**: [NextAuth.js (v5 beta)](https://authjs.dev/)
 - **Data Fetching / Admin Framework**: [@refinedev/core](https://refine.dev/)
 - **Styling**: [Tailwind CSS 4](https://tailwindcss.com/) & [Shadcn UI](https://ui.shadcn.com/)
 - **State Management**: [Zustand](https://zustand-demo.pmnd.rs/)
 - **Forms**: [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/) for validation
-- **Real-Time**: [Socket.io Client](https://socket.io/) for real-time chat and notifications
+- **Real-Time & AI**: [Socket.io Client](https://socket.io/) for chat events and [Vercel AI SDK](https://sdk.vercel.ai/) for token-by-token message streaming
 
 ## Getting Started
 
@@ -72,5 +72,6 @@ admin-dashboard/
 - **Authentication**: Secure login integrated with backend JWTs via NextAuth.
 - **Site Management**: Create and manage configured sites.
 - **Agent Dashboard**: Real-time interaction with visitors through WebSockets.
+- **AI Streaming**: Flawless token-by-token AI response streaming integrated with Vercel AI SDK (`useChat`).
 - **Documents**: File upload and management interface.
 - **Notifications**: Real-time system notifications powered by Socket.io.
