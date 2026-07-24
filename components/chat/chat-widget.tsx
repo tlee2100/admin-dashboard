@@ -94,6 +94,10 @@ export function ChatWidget({
   const prevScrollHeightRef = useRef(0);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasTriggeredFirstAi = useRef(false);
+  // Track which streaming session is active so we don't show stale aiMessages
+  const [activeStreamingSession, setActiveStreamingSession] = useState<
+    string | null
+  >(null);
 
   const transport = useMemo(
     () =>
@@ -127,35 +131,6 @@ export function ChatWidget({
     }
   }, [aiMessages, onStreamingMessagesChange]);
 
-  /**
-   * Converts the WebSocket/DB message history into the UIMessage format
-   * expected by useChat, so the model always receives the full conversation
-   * context. We exclude the last VISITOR message equal to `currentText`
-   * because sendMessage will append it itself.
-   */
-  const buildHistoryMessages = (currentText: string) => {
-    const history = messages.filter(
-      (m) =>
-        !(
-          m.senderType === "VISITOR" &&
-          m.content === currentText &&
-          m === messages[messages.length - 1]
-        ),
-    );
-    return history
-      .filter((m) => m.content)
-      .map((m) => ({
-        id: m.id,
-        role:
-          m.senderType === "VISITOR"
-            ? ("user" as const)
-            : ("assistant" as const),
-        content: m.content,
-        parts: [{ type: "text" as const, text: m.content }],
-        createdAt: new Date(m.createdAt),
-      }));
-  };
-
   // Auto-trigger first message stream if it's a new conversation
   useEffect(() => {
     if (
@@ -168,6 +143,8 @@ export function ChatWidget({
     ) {
       hasTriggeredFirstAi.current = true;
       // First message: no prior history, ensure aiMessages is empty
+      const sessionId = `first-${Date.now()}`;
+      setActiveStreamingSession(sessionId);
       setAiMessages([]);
       sendMessage({ text: messages[0].content });
     }
@@ -180,13 +157,25 @@ export function ChatWidget({
     setAiMessages,
   ]);
 
-  // Clear HTTP streaming message when WebSocket delivers the final version
+  // Clear HTTP streaming message when WebSocket delivers the final version.
+  // Only clear if we were actively streaming (streamingSessionRef is set) and
+  // the stream has now finished — this prevents clearing stale initial messages on reload.
+  const prevIsLoadingRef = useRef(false);
   useEffect(() => {
-    const lastWsMessage = messages[messages.length - 1];
-    if (lastWsMessage && lastWsMessage.senderType === "AI" && !isLoading) {
-      setAiMessages([]);
+    const wasLoading = prevIsLoadingRef.current;
+    prevIsLoadingRef.current = isLoading;
+
+    // We just finished streaming (loading went true -> false)
+    if (wasLoading && !isLoading && activeStreamingSession) {
+      const lastWsMessage = messages[messages.length - 1];
+      if (lastWsMessage && lastWsMessage.senderType === "AI") {
+        // WS delivered the saved message — safe to clear the streaming bubble
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setActiveStreamingSession(null);
+        setAiMessages([]);
+      }
     }
-  }, [messages, isLoading, setAiMessages]);
+  }, [messages, isLoading, setAiMessages, activeStreamingSession]);
 
   // Auto-scroll to bottom only for NEW messages (not when prepending history)
   useEffect(() => {
@@ -286,7 +275,9 @@ export function ChatWidget({
         ) {
           // We do not append files to stream yet, just the text if any
           if (textToSend) {
-            setAiMessages(buildHistoryMessages(textToSend));
+            const sessionId = `upload-${Date.now()}`;
+            setActiveStreamingSession(sessionId);
+            setAiMessages([]);
             sendMessage({ text: textToSend });
           }
         }
@@ -336,7 +327,12 @@ export function ChatWidget({
     onSendMessage(text);
 
     if (isAiActive && !isClosed && currentUserType === "VISITOR") {
-      setAiMessages(buildHistoryMessages(text));
+      // Start a new streaming session — clear old streaming messages,
+      // do NOT pass DB history into aiMessages (that causes the raw 0:"..." display bug).
+      // The backend already receives full history via the messages[] payload in the POST body.
+      const sessionId = `send-${Date.now()}`;
+      setActiveStreamingSession(sessionId);
+      setAiMessages([]);
       sendMessage({ text });
     }
 
@@ -527,6 +523,10 @@ export function ChatWidget({
         ))}
 
         {(() => {
+          // Only show the streaming bubble when there is an ACTIVE streaming session.
+          // This prevents stale/old aiMessages from re-appearing as a streaming bubble.
+          if (!activeStreamingSession) return null;
+
           const assistantAiMessages = aiMessages.filter(
             (m) => m.role === "assistant",
           );
