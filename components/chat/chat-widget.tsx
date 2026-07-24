@@ -516,7 +516,10 @@ export function ChatWidget({
           <MessageBubble
             key={msg.id}
             message={msg}
-            isCurrentUser={msg.senderType === currentUserType}
+            isCurrentUser={
+              msg.senderType === currentUserType ||
+              (currentUserType === "AGENT" && msg.senderType === "AI")
+            }
             onReact={onReactMessage}
             currentUserType={currentUserType}
           />
@@ -563,7 +566,7 @@ export function ChatWidget({
                   createdAt: new Date().toISOString(),
                   status: "SENT",
                 }}
-                isCurrentUser={false}
+                isCurrentUser={currentUserType === "AGENT"}
                 currentUserType={currentUserType}
               />
             );

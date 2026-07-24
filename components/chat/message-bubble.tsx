@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { ChatMessage } from "@/types/chat";
-import { User, Headset, Check, CheckCheck, Paperclip } from "lucide-react";
+import { User, Headset, Check, CheckCheck, Paperclip, Bot } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
@@ -106,6 +106,8 @@ export function MessageBubble({
         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shadow-sm">
           {message.senderType === "AGENT" ? (
             <Headset className="w-4 h-4 text-primary" />
+          ) : message.senderType === "AI" ? (
+            <Bot className="w-4 h-4 text-indigo-500" />
           ) : (
             <User className="w-4 h-4 text-slate-500 dark:text-slate-400" />
           )}
