@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
-import { useVisitorChatStore } from "@/types/visitor-chat-store"; // adjust if moved to /store
+import { useVisitorChatStore } from "@/store/visitor-chat-store";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { v4 as uuidv4 } from "uuid";
 

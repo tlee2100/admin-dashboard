@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { ChatMessage } from "../types/chat";
+import { ChatMessage } from "@/types/chat";
 
 interface AgentChatState {
   messagesByConversation: Record<string, ChatMessage[]>;

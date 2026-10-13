@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "next-themes";
 import { Providers } from "@/app/provider";
 import { Toaster } from "sonner";
+import { auth } from "@/auth";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,11 +21,13 @@ export const metadata: Metadata = {
   description: "Admin dashboard for user management",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await auth();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -34,7 +37,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <Providers>{children}</Providers>
+          <Providers session={session}>{children}</Providers>
           <Toaster richColors position="top-right" />
         </ThemeProvider>
       </body>

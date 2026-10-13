@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { getRecaptchaToken } from "@/lib/recaptcha";
-import { loginAction, type LoginState } from "@/app/api/login/actions";
+import { loginAction, type LoginState } from "./actions";
 import {
   loginSchema,
   twoFactorSchema,

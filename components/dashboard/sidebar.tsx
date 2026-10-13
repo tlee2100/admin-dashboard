@@ -1,9 +1,10 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CanAccess } from "@refinedev/core";
+import { CanAccess, useList } from "@refinedev/core";
+import { Conversation } from "@/types/chat";
 import React, { useEffect } from "react";
-import { useUIStore } from "@/store/ui-store";
+import { useSidebar } from "@/store/ui-store";
 import {
   PanelLeftClose,
   PanelLeftOpen,
@@ -38,7 +39,7 @@ const navItems = [
 ];
 
 export function Sidebar() {
-  const { sidebarOpen, toggleSidebar, setSidebarOpen } = useUIStore();
+  const { sidebarOpen, toggleSidebar, setSidebarOpen } = useSidebar();
   const pathname = usePathname();
 
   useEffect(() => {
@@ -131,9 +132,6 @@ export function Sidebar() {
     </aside>
   );
 }
-
-import { useList } from "@refinedev/core";
-import { Conversation } from "@/types/chat";
 
 function ActiveChatsList() {
   const pathname = usePathname();

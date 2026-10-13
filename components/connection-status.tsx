@@ -1,5 +1,5 @@
 "use client";
-import { useNotificationsStore } from "@/lib/store/notifications-store";
+import { useNotificationsStore } from "@/store/notifications-store";
 import { cn } from "@/lib/utils";
 
 const STATUS_CONFIG = {

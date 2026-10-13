@@ -1,14 +1,8 @@
 "use client";
 
 import { useTable, useDelete, CanAccess, useSelect } from "@refinedev/core";
-import { useState, useEffect } from "react";
-import {
-  Trash2,
-  Plus,
-  ChevronLeft,
-  ChevronRight,
-  FileText,
-} from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Trash2, Plus, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,20 +22,9 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { DocumentDrawer } from "@/components/dashboard/document-drawer";
-import { useRef } from "react";
-
-const getInitialFilter = (field: string, defaultValue: string = "") => {
-  if (typeof window === "undefined") return defaultValue;
-  const params = new URLSearchParams(window.location.search);
-  for (const [key, val] of params.entries()) {
-    if (key.includes("[field]") && val === field) {
-      const match = key.match(/filters\[(\d+)\]/);
-      if (match)
-        return params.get(`filters[${match[1]}][value]`) || defaultValue;
-    }
-  }
-  return defaultValue;
-};
+import { TablePagination } from "@/components/dashboard/table-pagination";
+import { ConfirmDeleteDialog } from "@/components/dashboard/confirm-delete-dialog";
+import { getInitialFilter } from "@/hooks/use-table-filter";
 
 export default function DocumentsListPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -305,33 +288,11 @@ export default function DocumentsListPage() {
       </div>
 
       {/* Pagination */}
-      {pageCount > 1 && (
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Page {currentPage} of {pageCount}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                setCurrentPage((prev) => Math.min(prev + 1, pageCount))
-              }
-              disabled={currentPage === pageCount}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+      <TablePagination
+        currentPage={currentPage}
+        pageCount={pageCount}
+        onPageChange={setCurrentPage}
+      />
 
       <Dialog open={isSiteSelectOpen} onOpenChange={setIsSiteSelectOpen}>
         <DialogContent className="sm:max-w-[425px]">
@@ -382,36 +343,14 @@ export default function DocumentsListPage() {
       )}
 
       {/* Delete Confirmation Modal */}
-      <Dialog
-        open={!!deleteId}
-        onOpenChange={(open) => !open && setDeleteId(null)}
-      >
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Delete Document</DialogTitle>
-          </DialogHeader>
-          <p className="py-4 text-sm text-gray-500 dark:text-gray-400">
-            Are you sure you want to delete this document? This action cannot be
-            undone and data will be permanently lost.
-          </p>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteId(null)}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? "Deleting..." : "Confirm Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDeleteDialog
+        isOpen={!!deleteId}
+        isLoading={isDeleting}
+        title="Delete Document"
+        description="Are you sure you want to delete this document? This action cannot be undone and data will be permanently lost."
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }

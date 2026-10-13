@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { ChatMessage, Conversation } from "../types/chat";
+import { ChatMessage, Conversation } from "@/types/chat";
 import type { UIMessage } from "ai";
 
 interface VisitorChatState {
@@ -122,7 +122,7 @@ export const useVisitorChatStore = create<VisitorChatState>()(
       setStreamingMessages: (messages) => set({ streamingMessages: messages }),
     }),
     {
-      name: "visitor_chat_storage", // using underscore as requested by the user for visitor_conversation_id conceptually, but here we just rename it
+      name: "visitor_chat_storage",
       storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         currentConversation: state.currentConversation,

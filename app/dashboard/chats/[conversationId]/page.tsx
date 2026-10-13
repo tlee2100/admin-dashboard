@@ -4,9 +4,10 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { io, Socket } from "socket.io-client";
-import { useAgentChatStore } from "@/types/agent-chat-store";
+import { useAgentChatStore } from "@/store/agent-chat-store";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { v4 as uuidv4 } from "uuid";
+import { toast } from "sonner";
 
 const PAGE_LIMIT = process.env.NEXT_PUBLIC_CHAT_PAGE_SIZE
   ? parseInt(process.env.NEXT_PUBLIC_CHAT_PAGE_SIZE as string, 10)
@@ -203,7 +204,7 @@ export default function AgentChatRoom() {
       );
 
       socketInstance.on("joinError", (error) => {
-        alert(error.message || "Unable to join conversation.");
+        toast.error(error.message || "Unable to join conversation.");
         router.push("/dashboard/chats");
       });
 
@@ -399,6 +400,11 @@ export default function AgentChatRoom() {
       return;
     }
 
+    // Automatically deactivate AI when human agent sends a message
+    if (isAiActive) {
+      handleToggleAi(false);
+    }
+
     // Emit to server
     socket.emit("sendMessage", {
       conversationId,
@@ -471,10 +477,6 @@ export default function AgentChatRoom() {
   };
 
   const handleEndChat = async () => {
-    if (!window.confirm("Are you sure you want to end this conversation?")) {
-      return;
-    }
-
     if (!session?.accessToken) return;
     try {
       const res = await fetch(
@@ -488,12 +490,13 @@ export default function AgentChatRoom() {
       );
       if (res.ok) {
         setIsClosed(true);
+        toast.success("Conversation closed successfully");
       } else {
-        alert("Failed to end chat");
+        toast.error("Failed to end chat");
       }
     } catch (error) {
       console.error(error);
-      alert("Error ending chat");
+      toast.error("Error ending chat");
     }
   };
 
@@ -505,6 +508,10 @@ export default function AgentChatRoom() {
     if (!socket || !isConnected) return;
     socket.emit("joinConversation", { conversationId });
     setIsJoined(true);
+    // When agent joins, automatically disable AI so human takes over
+    if (isAiActive) {
+      handleToggleAi(false);
+    }
   };
 
   return (

@@ -7,29 +7,13 @@ import { useTable, useSelect, useInvalidate, CanAccess } from "@refinedev/core";
 import { Conversation } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  MessageCircle,
-  User,
-  ChevronLeft,
-  ChevronRight,
-  Trash2,
-  Bot,
-} from "lucide-react";
+import { TablePagination } from "@/components/dashboard/table-pagination";
+import { ConfirmDeleteDialog } from "@/components/dashboard/confirm-delete-dialog";
+import { getInitialFilter } from "@/hooks/use-table-filter";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-
-const getInitialFilter = (field: string, defaultValue: string = "") => {
-  if (typeof window === "undefined") return defaultValue;
-  const params = new URLSearchParams(window.location.search);
-  for (const [key, val] of params.entries()) {
-    if (key.includes("[field]") && val === field) {
-      const match = key.match(/filters\[(\d+)\]/);
-      if (match)
-        return params.get(`filters[${match[1]}][value]`) || defaultValue;
-    }
-  }
-  return defaultValue;
-};
+import { MessageCircle, User, Trash2, Bot } from "lucide-react";
 
 export default function AgentInboxPage() {
   const router = useRouter();
@@ -166,14 +150,15 @@ export default function AgentInboxPage() {
     };
   }, [session?.accessToken, invalidate]);
 
-  const handleDeleteChat = async (conversationId: string) => {
-    if (!session?.accessToken) return;
-    if (!confirm("Are you sure you want to permanently delete this chat?"))
-      return;
+  const [deleteChatId, setDeleteChatId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
+  const confirmDeleteChat = async () => {
+    if (!deleteChatId || !session?.accessToken) return;
+    setIsDeleting(true);
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/chat/conversations/${conversationId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/chat/conversations/${deleteChatId}`,
         {
           method: "DELETE",
           headers: {
@@ -182,16 +167,20 @@ export default function AgentInboxPage() {
         },
       );
       if (res.ok) {
+        toast.success("Chat deleted successfully");
         invalidate({
           resource: "chat/conversations/active",
           invalidates: ["list"],
         });
+        setDeleteChatId(null);
       } else {
-        alert("Failed to delete chat");
+        toast.error("Failed to delete chat");
       }
     } catch (error) {
       console.error(error);
-      alert("Error deleting chat");
+      toast.error("Error deleting chat");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -333,7 +322,7 @@ export default function AgentInboxPage() {
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => handleDeleteChat(conv.id)}
+                        onClick={() => setDeleteChatId(conv.id)}
                         title="Delete Chat"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -346,31 +335,22 @@ export default function AgentInboxPage() {
           ))}
 
           {/* Pagination Controls */}
-          {pageCount > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(currentPage - 1)}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className="w-4 h-4 mr-1" /> Prev
-              </Button>
-              <span className="text-sm text-muted-foreground mx-2">
-                Page {currentPage} of {pageCount}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage === pageCount}
-              >
-                Next <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </div>
-          )}
+          <TablePagination
+            currentPage={currentPage}
+            pageCount={pageCount}
+            onPageChange={setCurrentPage}
+          />
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        isOpen={!!deleteChatId}
+        isLoading={isDeleting}
+        title="Delete Chat"
+        description="Are you sure you want to permanently delete this chat conversation? This action cannot be undone."
+        onConfirm={confirmDeleteChat}
+        onCancel={() => setDeleteChatId(null)}
+      />
     </div>
   );
 }

@@ -68,27 +68,30 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
   const isSuperAdmin = session?.user?.role?.toUpperCase() === "SUPER_ADMIN";
   const isAdmin = session?.user?.role?.toUpperCase() === "ADMIN";
 
-  // Fetch all users then filter by role AGENT on client side
-  // (backend role filter can be unreliable due to enum casing)
+  // Fetch agents filtered by role on server
   const { query: agentsQuery } = useList({
     resource: "users",
-    pagination: { mode: "server", currentPage: 1, pageSize: 1000 },
+    filters: [
+      {
+        field: "role",
+        operator: "eq",
+        value: "agent",
+      },
+    ],
+    pagination: { mode: "server", currentPage: 1, pageSize: 100 },
     queryOptions: {
       enabled: isSuperAdmin || isAdmin,
     },
   });
 
   const isAgentsLoading = agentsQuery.isLoading;
-  const allUsers =
+  const allAgents =
     (agentsQuery.data?.data as {
       id: string | number;
       role: string;
       email: string;
       name: string;
     }[]) || [];
-  const allAgents = allUsers.filter(
-    (u) => String(u.role).toUpperCase() === "AGENT",
-  );
 
   // Fetch current site details to get assigned agents
   const { query: siteQuery } = useOne({
@@ -112,13 +115,6 @@ export function AgentDrawer({ siteId, siteName, onClose }: AgentDrawerProps) {
     (currentPage - 1) * pageSize,
     currentPage * pageSize,
   );
-
-  // DEBUG
-  console.log("[AgentDrawer] siteId:", siteId);
-  console.log("[AgentDrawer] siteQuery.data:", siteQuery.data);
-  console.log("[AgentDrawer] assignedAgents:", assignedAgents);
-  console.log("[AgentDrawer] allUsers count:", allUsers.length);
-  console.log("[AgentDrawer] allAgents (AGENT role):", allAgents);
 
   // Filter out agents that are already assigned
   const availableAgents = allAgents.filter(

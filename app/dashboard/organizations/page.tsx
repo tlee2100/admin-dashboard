@@ -6,14 +6,9 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import {
-  Pencil,
-  Trash2,
-  Plus,
-  ChevronLeft,
-  ChevronRight,
-  Building2,
-} from "lucide-react";
+import { Pencil, Trash2, Plus, Building2 } from "lucide-react";
+import { TablePagination } from "@/components/dashboard/table-pagination";
+import { ConfirmDeleteDialog } from "@/components/dashboard/confirm-delete-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -230,31 +225,11 @@ export default function OrganizationListPage() {
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>
-          Page {currentPage} / {pageCount}
-        </span>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={(currentPage ?? 1) <= 1}
-            onClick={() => setCurrentPage((currentPage ?? 1) - 1)}
-            className="gap-1"
-          >
-            <ChevronLeft className="size-4" /> Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={(currentPage ?? 1) >= (pageCount ?? 1)}
-            onClick={() => setCurrentPage((currentPage ?? 1) + 1)}
-            className="gap-1"
-          >
-            Next <ChevronRight className="size-4" />
-          </Button>
-        </div>
-      </div>
+      <TablePagination
+        currentPage={currentPage}
+        pageCount={pageCount}
+        onPageChange={setCurrentPage}
+      />
 
       {/* Create / Edit Modal */}
       <Dialog
@@ -344,29 +319,16 @@ export default function OrganizationListPage() {
       </Dialog>
 
       {/* Delete Confirmation Modal */}
-      {deleteId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
-          <div className="bg-background rounded-xl p-6 shadow-xl w-[340px] flex flex-col gap-4">
-            <h3 className="font-semibold text-lg">Confirm Deletion</h3>
-            <p className="text-sm text-muted-foreground">
-              Are you sure you want to delete this organization? This action
-              cannot be undone.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <Button variant="outline" onClick={() => setDeleteId(null)}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                disabled={isDeleting}
-                onClick={() => handleDelete(deleteId)}
-              >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDeleteDialog
+        isOpen={!!deleteId}
+        isLoading={isDeleting}
+        title="Delete Organization"
+        description="Are you sure you want to delete this organization? This action cannot be undone."
+        onConfirm={() => {
+          if (deleteId) handleDelete(deleteId);
+        }}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }

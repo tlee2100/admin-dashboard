@@ -2,7 +2,7 @@
 import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { io, Socket } from "socket.io-client";
-import { useNotificationsStore } from "@/lib/store/notifications-store";
+import { useNotificationsStore } from "@/store/notifications-store";
 import { toast } from "sonner";
 
 export function NotificationSocketProvider({

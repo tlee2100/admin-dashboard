@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { useNotificationsStore } from "@/lib/store/notifications-store";
+import { useNotificationsStore } from "@/store/notifications-store";
 
 export function NotificationBell() {
   const notifications = useNotificationsStore((s) => s.notifications);

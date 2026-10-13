@@ -64,7 +64,12 @@ export default function ProfilePage() {
     }
 
     setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
+    setAvatarPreview((prev) => {
+      if (prev && prev.startsWith("blob:")) {
+        URL.revokeObjectURL(prev);
+      }
+      return URL.createObjectURL(file);
+    });
   }
 
   async function onSubmit(values: ProfileInput) {

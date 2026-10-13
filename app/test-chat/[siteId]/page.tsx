@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { useVisitorChatStore } from "@/types/visitor-chat-store";
+import { useVisitorChatStore } from "@/store/visitor-chat-store";
 import { Send, MessageSquare, Loader2 } from "lucide-react";
 
 // Import shadcn components
@@ -64,7 +64,7 @@ export default function ChatLandingPage() {
     if (siteId) {
       fetchSiteInfo();
     }
-  }, [siteId]);
+  }, [siteId, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

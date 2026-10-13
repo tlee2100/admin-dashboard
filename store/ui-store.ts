@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -15,6 +16,30 @@ export const useUIStore = create<UIState>()(
         set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
     }),
-    { name: "ui-store" }, // key trong localStorage
+    {
+      name: "ui-store",
+    },
   ),
 );
+
+const emptySubscribe = () => () => {};
+
+/**
+ * Hook that safely returns the persisted sidebar state on the client
+ * while matching the default desktop state (open) during SSR to prevent hydration errors.
+ */
+export function useSidebar() {
+  const store = useUIStore();
+  const isHydrated = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+
+  return {
+    sidebarOpen: isHydrated ? store.sidebarOpen : true,
+    toggleSidebar: store.toggleSidebar,
+    setSidebarOpen: store.setSidebarOpen,
+    isHydrated,
+  };
+}

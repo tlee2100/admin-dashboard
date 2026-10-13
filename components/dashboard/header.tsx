@@ -1,7 +1,7 @@
 "use client";
 import { signOut } from "next-auth/react";
 import { LogOut, Menu } from "lucide-react";
-import { useUIStore } from "@/store/ui-store";
+import { useSidebar } from "@/store/ui-store";
 import { Breadcrumb } from "./breadcrumb";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +30,7 @@ function initials(name?: string | null, email?: string | null) {
 }
 
 export function Header({ user }: { user?: HeaderUser }) {
-  const { toggleSidebar } = useUIStore();
+  const { toggleSidebar } = useSidebar();
 
   return (
     <header className="flex h-12 items-center justify-between border-b px-4 shrink-0">

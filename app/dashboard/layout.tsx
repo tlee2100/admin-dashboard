@@ -2,11 +2,8 @@ import { auth } from "@/auth";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
 import { NotificationSocketProvider } from "@/components/notification-socket-provider";
-import { Providers } from "@/app/provider";
 import { RefineProvider } from "@/components/providers/refine-provider";
-import { DashboardWrapper } from "@/components/dashboard/dashboard-wrapper";
 
-// Server Component (không "use client") → gọi auth() trực tiếp, không cần useSession()
 export default async function DashboardLayout({
   children,
 }: {
@@ -15,20 +12,16 @@ export default async function DashboardLayout({
   const session = await auth();
 
   return (
-    <Providers session={session}>
-      <RefineProvider>
-        <DashboardWrapper>
-          <div className="flex h-screen overflow-hidden bg-background">
-            <Sidebar />
-            <div className="flex flex-1 flex-col min-w-0">
-              <NotificationSocketProvider>
-                <Header user={session?.user} />
-              </NotificationSocketProvider>
-              <main className="flex-1 overflow-y-auto p-6">{children}</main>
-            </div>
+    <RefineProvider>
+      <NotificationSocketProvider>
+        <div className="flex h-screen overflow-hidden bg-background">
+          <Sidebar />
+          <div className="flex flex-1 flex-col min-w-0">
+            <Header user={session?.user} />
+            <main className="flex-1 overflow-y-auto p-6">{children}</main>
           </div>
-        </DashboardWrapper>
-      </RefineProvider>
-    </Providers>
+        </div>
+      </NotificationSocketProvider>
+    </RefineProvider>
   );
 }

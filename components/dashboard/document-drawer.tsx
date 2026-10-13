@@ -4,7 +4,7 @@ import { useTable, useDelete, CanAccess } from "@refinedev/core";
 import { useState, useCallback, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useDropzone } from "react-dropzone";
-import { useNotificationsStore } from "@/lib/store/notifications-store";
+import { useNotificationsStore } from "@/store/notifications-store";
 import {
   FileText,
   Trash2,
